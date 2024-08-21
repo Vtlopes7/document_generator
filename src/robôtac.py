@@ -1752,7 +1752,8 @@ for index, row in instruir.iterrows():
 
 
   tipo = instruir['DOC'].iloc[0]
-  qtd_notas = len(lista_notas)
+  notas_filtradas = notas[notas['PROCESSO'] == processo]
+  qtd_notas = len(notas_filtradas)
 
 
   if tipo == 'DNF' and qtd_notas > 1:
@@ -1874,14 +1875,17 @@ for index, row in instruir.iterrows():
   paragrafo1.font.size = Pt(12)
   paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run(' prestados no período de ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+  if tipo == 'DNF':
+    periodo = ""
 
-  paragrafo1 = paragrafo.add_run(periodo)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+  else:
+    paragrafo1 = paragrafo.add_run(' prestados no período de ')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+    paragrafo1 = paragrafo.add_run(periodo)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
 
   paragrafo1 = paragrafo.add_run(', apresentada pela empresa ')
   paragrafo1.font.size = Pt(12)
@@ -2076,14 +2080,17 @@ for index, row in instruir.iterrows():
   paragrafo1.font.size = Pt(12)
   paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run(' no período de ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+  if tipo == 'DNF':
+    periodo = ""
 
-  paragrafo1 = paragrafo.add_run(periodo)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+  else:
+    paragrafo1 = paragrafo.add_run(' prestados no período de ')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+    paragrafo1 = paragrafo.add_run(periodo)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
 
   paragrafo1 = paragrafo.add_run(f', referente {num_notas} n° ')
   paragrafo1.font.size = Pt(12)
@@ -2510,6 +2517,20 @@ print(f'Tempo de execução: {execution_time} segundos')
 
 """# Saída"""
 
+tipo  = 'NF'
+
+
+if tipo == 'DNF':
+  periodo = ","
+
+else:
+  periodo = 'prestados no período de '
+
+
+
+
+periodo
+
 from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.shared import Pt, RGBColor, Inches
@@ -2530,7 +2551,8 @@ notas = gc.open('Dados TAC').get_worksheet(3).get_all_records()
 
 notas = pd.DataFrame(notas)
 
-num_notas
+notas_filtradas = notas[notas['PROCESSO'] == '014/002029/2024']
+len(notas_filtradas)
 
 from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
@@ -2556,14 +2578,21 @@ valor = valor.replace("$", "R$ ")
 
 
 
-
-
-
+paragrafo1 = paragrafo.add_run(' prestados no período de ')
+paragrafo1.font.size = Pt(12)
+paragrafo1.font.name = 'Arial'
 
 
 tipo = instruir['DOC'].iloc[0]
 processo = instruir['PROCESSO']
 qtd_notas = 2
+
+
+
+
+
+
+
 
 
 
@@ -2587,25 +2616,50 @@ else:
 
 valor
 
-tipo = instruir['DOC'].iloc[0]
-  qtd_notas = len(lista_notas)
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt, RGBColor, Inches
+from docx.oxml.ns import qn
+from datetime import datetime
+import time
+import pandas as pd
+from num2words import num2words
+
+start_time = time.time()
+
+# LISTA DE PROCESSOS PARA INSTRUÇÃO
+
+sheet_title = 'Dados TAC'
+instruir = gc.open('Dados TAC').get_worksheet(2).get_all_records()
+
+instruir = pd.DataFrame(instruir)
 
 
-  if tipo == 'DNF' and qtd_notas > 1:
-    num_notas = 'às DANFES'
-
-  elif tipo == 'DNF' and qtd_notas == 1:
-    num_notas = 'a DANFE'
-
-
-  elif tipo == 'NF' and qtd_notas > 1:
-    num_notas = 'às Notas Fiscais'
-
-  elif  tipo == 'NF' and qtd_notas == 1:
-    num_notas = 'a Nota Fiscal'
-
-  else:
-    num_notas = 'a fatura de locação'
 
 instruir
+
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt, RGBColor, Inches
+from docx.oxml.ns import qn
+from datetime import datetime
+import time
+import pandas as pd
+from num2words import num2words
+
+start_time = time.time()
+
+# LISTA DE PROCESSOS PARA INSTRUÇÃO
+
+sheet_title = 'Dados TAC'
+despachos = gc.open('Dados TAC').get_worksheet(7).get_all_records()
+
+
+# DATA FRAMES
+despachos = pd.DataFrame(despachos)
+
+
+len(despachos)
+
+agrupados
 
