@@ -1766,7 +1766,7 @@ for index, row in instruir.iterrows():
   lista_notas = agrupados.loc[agrupados['PROCESSO'] == processo, 'NOTAS'].to_string(index = False)
 
 
-  tipo = instruir['DOC'].iloc[0]
+  tipo = row['DOC']
   notas_filtradas = notas[notas['PROCESSO'] == processo]
   qtd_notas = len(notas_filtradas)
 
@@ -1784,8 +1784,11 @@ for index, row in instruir.iterrows():
   elif  tipo == 'NF' and qtd_notas == 1:
     num_notas = 'a Nota Fiscal'
 
-  else:
+  elif tipo == 'FL':
     num_notas = 'a fatura de locação'
+
+  else:
+    num_notas = 'TIPO DE DOCUMENTO NÃO ESPECIFICADO NA PLANILHA'
 
 
 # Data de emissão
@@ -2000,7 +2003,7 @@ for index, row in instruir.iterrows():
   paragraph_format = num_processo.paragraph_format
   paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  paragrafo = num_processo.add_run(f'Processo n° {processo_fll}')
+  paragrafo = num_processo.add_run(f'\nProcesso n° {processo_fll}')
   paragrafo.bold = True
   paragrafo.font.size = Pt(11)
   paragrafo.font.name = 'Arial'
@@ -2217,7 +2220,7 @@ for index, row in instruir.iterrows():
   paragraph_format = num_processo.paragraph_format
   paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  paragrafo = num_processo.add_run(f'Processo n° {processo_flll}')
+  paragrafo = num_processo.add_run(f'\n\nProcesso n° {processo_flll}')
   paragrafo.bold = True
   paragrafo.font.size = Pt(11)
   paragrafo.font.name = 'Arial'
@@ -2382,7 +2385,35 @@ for index, row in instruir.iterrows():
 execution_time = end_time - start_time
 print(f"Tempo de execução: {execution_time} segundos")
 
+valor_numerico
 
+processo = instruir['PROCESSO'].iloc[4]
+
+tipo = instruir['DOC'].iloc[4]
+notas_filtradas = notas[notas['PROCESSO'] == processo]
+qtd_notas = len(notas_filtradas)
+
+
+if tipo == 'DNF' and qtd_notas > 1:
+   num_notas = 'às DANFES'
+
+elif tipo == 'DNF' and qtd_notas == 1:
+    num_notas = 'a DANFE'
+
+
+elif tipo == 'NF' and qtd_notas > 1:
+  num_notas = 'às Notas Fiscais'
+
+elif  tipo == 'NF' and qtd_notas == 1:
+  num_notas = 'a Nota Fiscal'
+
+elif tipo == 'FL':
+  num_notas = 'a fatura de locação'
+
+else:
+  num_notas = 'TIPO DE DOCUMENTO NÃO ESPECIFICADO NA PLANILHA'
+
+num_notas
 
 """# PROHEALTH"""
 
