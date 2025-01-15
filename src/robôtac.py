@@ -25,7 +25,6 @@ DADOS TAC, DADOS REC, Instruir, Notas, Prohealth, Sigfis, Dados, Boletim
 !pip install num2words
 !pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 !pip install python-docx
-
 from google.colab import auth, drive
 from google.auth import default
 import gspread
@@ -39,7 +38,7 @@ gc = gspread.authorize(creds)
 
 drive.mount('/content/drive')
 
-"""# TAC"""
+"""# TAC/REC"""
 
 from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
@@ -49,1605 +48,1081 @@ from datetime import datetime
 import time
 import pandas as pd
 from num2words import num2words
+import os
+
 
 start_time = time.time()
 
 
 # Planilha
-sheet_title = 'Dados TAC'
-sheet = gc.open('Dados TAC').sheet1
+sheet_title = gc.open('Livro TAC/REC')
+sheet = sheet_title.worksheet('A confeccionar')
 
 # Convertendo planilha em Data Frame
 tabela = pd.DataFrame(sheet.get_all_records())
 
+
 for index, row in tabela.iterrows():
   doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
+  if row['Processo'] == "":
+    break
+  else:
+    if row['Termo'] == 'REC':
+      t = 'REC'
+      termo = 'TERMO DE RECONHECIMENTO DE DÍVIDA'
+      livro = '001'
+    elif row['Termo'] == 'TAC':
+      t = 'TAC'
+      termo = 'TERMO DE AJUSTE DE CONTAS'
+      livro = '002'
+    else:
+      print('termo não especificado na planilha')
 
-  section = doc.sections[0]
-  section.left_margin = Inches(0.8)
-  section.right_margin = Inches(0.8)
+
+
+    section = doc.sections[0]
+    section.left_margin = Inches(0.8)
+    section.right_margin = Inches(0.8)
 
 
   # Valor Monetário por extenso
 
-  valor_texto = row["Valor"]
-  valor_numerico = valor_texto.replace(",", ".").replace(".","")
-  valor_numerico = valor_numerico.replace("$","")
-  valor_numerico = int(valor_numerico)
-  valor_numerico = valor_numerico / 100
+    valor_texto = row["Valor"]
+    valor_numerico = valor_texto.replace(",", ".").replace(".","")
+    valor_numerico = valor_numerico.replace("$","")
+    valor_numerico = int(valor_numerico)
+    valor_numerico = valor_numerico / 100
 
 
-  def valor_monetario_por_extenso(valor_numerico):
+    def valor_monetario_por_extenso(valor_numerico):
 
-      # Separar a parte inteira e decimal do valor
-      reais, centavos = divmod(valor_numerico, 1)
-      centavos = round(centavos * 100)
+        # Separar a parte inteira e decimal do valor
+        reais, centavos = divmod(valor_numerico, 1)
+        centavos = round(centavos * 100)
 
-      # Converter a parte inteira para extenso
-      reais = num2words(reais, lang='pt_BR')
+        # Converter a parte inteira para extenso
+        reais = num2words(reais, lang='pt_BR')
 
-      # Converter a parte decimal para extenso
-      centavos = num2words(centavos, lang='pt_BR')
+        # Converter a parte decimal para extenso
+        centavos = num2words(centavos, lang='pt_BR')
 
-      if centavos == 'zero':
-        extenso_final = f'{reais} reais'
-      else: # Assign a value to extenso_final when centavos is not zero
-        extenso_final = f'{reais} reais e {centavos} centavos'
+        if centavos == 'zero':
+          extenso_final = f'{reais} reais'
+        else: # Assign a value to extenso_final when centavos is not zero
+          extenso_final = f'{reais} reais e {centavos} centavos'
 
-      return extenso_final
+        return extenso_final
 
 
   # Informaões do Termo
 
-  processo = row["Processo"]
-  TAC = str(row['TAC'])
-  ano_REC = str(row['Ano'])
-  Fls = row['Fls']
+    folha = row['Folha']
+    folha = folha + 1
+    processo = row["Processo"]
+    n_termo = str(row['Nº Termo'])
+    ano_termo = str(row['Ano'])
+    Fls_iniciais = str(row['Fls Iniciais'])
+    Fls_finais = str(row['Fls Finais'])
+    Fls = Fls_iniciais + '/' + Fls_finais
 
-  valor = row["Valor"]
-  valor = 'R' + valor
-  valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
-  valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
 
-  periodo = row["Período"]
-  empenho =  row["Empenho"]
-  CNPJ = row["CNPJ"]
-  empresa = row["Nome da empresa"]
-  CPF = row["CPF"]
-  endereco = row["endereco"]
-  Nome_socio = row['Nome sócio']
-  interessado = row['Interessado']
-  servico = row['Objeto']
+    valor = row["Valor"]
+    valor = 'R' + valor
+    valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
+    valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
+
+    periodo_inicial = row["Período Inicial"]
+    periodo_final = row["Período Final"]
+    if periodo_inicial == periodo_final:
+      periodo = periodo_inicial
+    else:
+      periodo = periodo_inicial + ' à ' + periodo_final
+    empenho =  row["Empenho"]
+    CNPJ = row["CNPJ"]
+    empresa = row["Nome da empresa"]
+    CPF = row["CPF"]
+    endereco = row["endereco"]
+    Nome_socio = row['Nome sócio']
+    interessado = row['Interessado']
+    servico = row['Objeto']
 
   # Data
 
-  dia = str(datetime.now().strftime("%d"))
-  mes_atual = datetime.now().month
-  meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-  nome_mes = meses[mes_atual - 1]
-  ano = str(datetime.now().year)
+    dia = str(datetime.now().strftime("%d"))
+    mes_atual = datetime.now().month
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+           "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    nome_mes = meses[mes_atual - 1]
+    ano = str(datetime.now().year)
 
 
   # Primeira página
 
-  titlet = doc.add_heading(level=1)
 
-  paragraph_format = titlet.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+  # Título
 
-  run = titlet.add_run("TERMO DE AJUSTE DE CONTAS\n")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.underline = True
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    paragrafo_inicial = doc.add_paragraph('')
+    paragrafo1 = paragrafo_inicial.add_run(f'Processo n° {processo} FL: {folha}')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+    paragrafo_inicial.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+    paragraph_format = paragrafo_inicial.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
 
-  run = titlet.add_run(f"\nLivro: 002/{ano_REC}")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    titlet = doc.add_heading(level=1)
 
+    paragraph_format = titlet.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  run = titlet.add_run(f"\nTermo {TAC}/{ano_REC}")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    run = titlet.add_run(f"{termo}\n")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.underline = True
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
-  run = titlet.add_run(f"\nFls: {Fls}\n")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  run = titlet.add_run(f"\nTERMO DE AJUSTE DE CONTAS QUE ENTRE SI\nCELEBRAM O MUNICÍPIO DE DUQUE DE CAXIAS,\nATRAVÉS DA SECRETARIA MUNICIPAL DE SAÚDE E,\n {empresa}\nNA FORMA ABAIXO:")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  run.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  titlet.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run.font.color.rgb = RGBColor(0, 0, 0)
+    run = titlet.add_run(f"\nLivro: {livro}/{ano_termo}")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
 
-  run.font.all_caps = True
-  run.bold = True
+    run = titlet.add_run(f"\nTermo: {n_termo}/{ano_termo}")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
+
+    run = titlet.add_run(f"\nFls: {Fls}\n")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
+
+    run = titlet.add_run(f"\n{termo} QUE ENTRE SI\nCELEBRAM O MUNICÍPIO DE DUQUE DE CAXIAS,\nATRAVÉS DA SECRETARIA MUNICIPAL DE SAÚDE E,\n {empresa}\nNA FORMA ABAIXO:")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
+
+    run.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    titlet.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    run.font.color.rgb = RGBColor(0, 0, 0)
+
+
+    run.font.all_caps = True
+    run.bold = True
 
 
   # Data
 
-  paragrafo = doc.add_paragraph()
-  paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = paragrafo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    paragrafo = doc.add_paragraph()
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  paragrafo4 = paragrafo.add_run('\nAos ')
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(dia)
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(' de ')
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(nome_mes)
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(' de ')
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(ano)
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
+    paragrafo4 = paragrafo.add_run('\nAos ')
+    paragrafo4.font.size = Pt(11)
+    paragrafo4.font.name = 'Arial'
+    paragrafo4 = paragrafo.add_run(dia)
+    paragrafo4.bold = True
+    paragrafo4.font.size = Pt(11)
+    paragrafo4.font.name = 'Arial'
+    paragrafo4 = paragrafo.add_run(' de ')
+    paragrafo4.bold = True
+    paragrafo4.font.size = Pt(11)
+    paragrafo4.font.name = 'Arial'
+    paragrafo4 = paragrafo.add_run(nome_mes)
+    paragrafo4.bold = True
+    paragrafo4.font.size = Pt(11)
+    paragrafo4.font.name = 'Arial'
+    paragrafo4 = paragrafo.add_run(' de ')
+    paragrafo4.bold = True
+    paragrafo4.font.size = Pt(11)
+    paragrafo4.font.name = 'Arial'
+    paragrafo4 = paragrafo.add_run(ano)
+    paragrafo4.bold = True
+    paragrafo4.font.size = Pt(11)
+    paragrafo4.font.name = 'Arial'
+
 
   #Texto
 
-  paragrafo5 = paragrafo.add_run(", o Município de Duque de Caxias, inscrito no CNPJ sob o nº ")
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
+    paragrafo5 = paragrafo.add_run(", o Município de Duque de Caxias, inscrito no CNPJ sob o nº ")
+    paragrafo5.font.size = Pt(11)
+    paragrafo5.font.name = 'Arial'
 
-  paragrafo5 = paragrafo.add_run('29.138.328/0001-50')
-  paragrafo5.bold = True
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
+    paragrafo5 = paragrafo.add_run('29.138.328/0001-50')
+    paragrafo5.bold = True
+    paragrafo5.font.size = Pt(11)
+    paragrafo5.font.name = 'Arial'
 
-  paragrafo5 = paragrafo.add_run(', com endereço na Alameda Dona Esmeralda nº 206, RJ, doravante denominado MUNICÍPIO, neste ato representado pelo Excelentíssimo Senhor Prefeito Wilson Miguel dos Reis, brasileiro, casado, portador da carteira de identidade nº 910.645.077, expedida pelo IFP/RJ e inscrito no CPF/ MF sob o nº 311.163.537-68, residente nesta cidade, que delega competência através da Lei Municipal nº 2.825 de 06 de Janeiro de 2017, ao ilmo. Secretária Municipal de Saúde, ')
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
+    paragrafo5 = paragrafo.add_run(', com endereço na Alameda Dona Esmeralda nº 206, RJ, doravante denominado MUNICÍPIO, neste ato representado pela ilma. Secretária Municipal de Saúde, Dra Célia Serrano da Silva, brasileira, médica, portadora da carteira de identidade nº 2405860 expedida pelo SSP (PA) e inscrito no CPF sob o nº 392.515.002-15 com competência delegada através da Lei Municipal nº 2.825 de 06 de Janeiro de 2017,')
+    paragrafo5.font.size = Pt(11)
+    paragrafo5.font.name = 'Arial'
 
-
-  paragrafo5 = paragrafo.add_run('Dra Célia Serrano da Silva')
-  paragrafo5.bold = True
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-
-  paragrafo5 = paragrafo.add_run(', brasileira, médica, portadora da carteira de identidade nº 2405860 expedida pelo SSP (PA) e inscrito no CPF sob o nº ')
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-  paragrafo5 = paragrafo.add_run('392.515.002-15')
-  paragrafo5.bold = True
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-  paragrafo5 = paragrafo.add_run(', de outro lado, ')
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
+    paragrafo5 = paragrafo.add_run(' de outro lado, ')
+    paragrafo5.font.size = Pt(11)
+    paragrafo5.font.name = 'Arial'
 
   # Empresa
 
-  paragrafo2 = paragrafo.add_run(empresa)
-  paragrafo2.bold = True
-  paragrafo2.font.all_caps = True
-  paragrafo2.font.size = Pt(11)
-  paragrafo2.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(', doravante denominada CONTRATADA, pessoa jurídica de direito privado, com endereço, ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(endereco)
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(', devidamente inscrita no CNPJ sob nº ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(CNPJ)
-  paragrafo3.bold = True
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
+    paragrafo2 = paragrafo.add_run(empresa)
+    paragrafo2.bold = True
+    paragrafo2.font.all_caps = True
+    paragrafo2.font.size = Pt(11)
+    paragrafo2.font.name = 'Arial'
+    paragrafo3 = paragrafo.add_run(', doravante denominada CONTRATADA, pessoa jurídica de direito privado, com endereço, ')
+    paragrafo3.font.size = Pt(11)
+    paragrafo3.font.name = 'Arial'
+    paragrafo3 = paragrafo.add_run(endereco)
+    paragrafo3.font.size = Pt(11)
+    paragrafo3.font.name = 'Arial'
+    paragrafo3 = paragrafo.add_run(', devidamente inscrita no CNPJ sob nº ')
+    paragrafo3.font.size = Pt(11)
+    paragrafo3.font.name = 'Arial'
+    paragrafo3 = paragrafo.add_run(CNPJ)
+    paragrafo3.bold = True
+    paragrafo3.font.size = Pt(11)
+    paragrafo3.font.name = 'Arial'
 
   # Interessado
 
-  paragrafo3 = paragrafo.add_run(f' neste ato representada pelo ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(Nome_socio)
-  paragrafo3.bold = True
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(', devidamente inscrito no CPF nº ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(CPF)
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3.bold = True
-  paragrafo3 = paragrafo.add_run(f', {interessado}')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
+    if 'Sr.' in Nome_socio:
+      paragrafo3 = paragrafo.add_run(f' neste ato representada pelo ')
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
+      paragrafo3 = paragrafo.add_run(Nome_socio)
+      paragrafo3.bold = True
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
+      paragrafo3 = paragrafo.add_run(', devidamente inscrito no CPF nº ')
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
+      paragrafo3 = paragrafo.add_run(CPF)
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
+      paragrafo3.bold = True
+      paragrafo3 = paragrafo.add_run(f', {interessado}')
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
+
+    elif 'Sra.' in Nome_socio:
+      paragrafo3 = paragrafo.add_run(f' neste ato representada pela ')
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
+      paragrafo3 = paragrafo.add_run(Nome_socio)
+      paragrafo3.bold = True
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
+      paragrafo3 = paragrafo.add_run(', devidamente inscrita no CPF nº ')
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
+      paragrafo3 = paragrafo.add_run(CPF)
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
+      paragrafo3.bold = True
+      paragrafo3 = paragrafo.add_run(f', {interessado}')
+      paragrafo3.font.size = Pt(11)
+      paragrafo3.font.name = 'Arial'
 
 
   # Processo
 
-  paragrafo3 = paragrafo.add_run(', quando em conjunto denominadas as PARTES, tendo em vista o constante e decidido no Processo Administrativo de nº ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragrafo3 = paragrafo.add_run(processo)
-  paragrafo3.bold = True
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
+    paragrafo3 = paragrafo.add_run(', quando em conjunto denominadas as PARTES, tendo em vista o constante e decidido no Processo Administrativo de nº ')
+    paragrafo3.font.size = Pt(11)
+    paragrafo3.font.name = 'Arial'
+    paragrafo2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragrafo3 = paragrafo.add_run(processo)
+    paragrafo3.bold = True
+    paragrafo3.font.size = Pt(11)
+    paragrafo3.font.name = 'Arial'
 
   # Texto Fim
 
-  paragrafo3 = paragrafo.add_run(', firmam o presente TERMO que se regerá incondicional e irrestritamente pela legislação específica Federal, mediante as seguintes cláusulas e condições:')
-  paragrafo3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
+    paragrafo3 = paragrafo.add_run(', firmam o presente TERMO que se regerá incondicional e irrestritamente pela legislação específica Federal, mediante as seguintes cláusulas e condições:')
+    paragrafo3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragrafo3.font.size = Pt(11)
+    paragrafo3.font.name = 'Arial'
 
-  title = 1.5  # Espaçamento de 1.5 vezes o tamanho da fonte
-  title = WD_LINE_SPACING.MULTIPLE
-  title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    title = 1.5  # Espaçamento de 1.5 vezes o tamanho da fonte
+    title = WD_LINE_SPACING.MULTIPLE
+    title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
   # Centraliza o título
-  title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
-  doc.add_page_break()
+    doc.add_page_break()
 
 
   # Segunda Página
+    folha = folha + 1
+    paragrafo_inicial = doc.add_paragraph('')
+    paragrafo1 = paragrafo_inicial.add_run(f'\nProcesso n° {processo} FL {folha}')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+    paragrafo_inicial.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+    paragraph_format = paragrafo_inicial.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
 
   # Cláusula Primeira
 
-  title2 = doc.add_heading(level=1)
-  title2.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title2.add_run("\n\nCLÁUSULA PRIMEIRA\n")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    title2 = doc.add_heading(level=1)
+    title2.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    run = title2.add_run("CLÁUSULA PRIMEIRA\n")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
-  c1 = doc.add_paragraph()
-  c1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c1.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-  c11 = c1.add_run('O presente TERMO tem por objetivo a liquidação e o pagamento da importância de ')
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run(valor)
-  c11.bold = True
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run(valor_monetario_por_extenso)
-  c11.bold = True
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run('. Reconhecida a dívida pelo MUNICÍPIO em favor de ')
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run(empresa)
-  c11.bold = True
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run('.')
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
+    c1 = doc.add_paragraph()
+    c1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = c1.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    c11 = c1.add_run('O presente TERMO tem por objetivo a liquidação e o pagamento da importância de ')
+    c11.font.size = Pt(11)
+    c11.font.name = 'Arial'
+    c11 = c1.add_run(valor)
+    c11.bold = True
+    c11.font.size = Pt(11)
+    c11.font.name = 'Arial'
+    c11 = c1.add_run(valor_monetario_por_extenso)
+    c11.bold = True
+    c11.font.size = Pt(11)
+    c11.font.name = 'Arial'
+    c11 = c1.add_run('. Reconhecida a dívida pelo MUNICÍPIO em favor de ')
+    c11.font.size = Pt(11)
+    c11.font.name = 'Arial'
+    c11 = c1.add_run(empresa)
+    c11.bold = True
+    c11.font.size = Pt(11)
+    c11.font.name = 'Arial'
+    c11 = c1.add_run('.')
+    c11.font.size = Pt(11)
+    c11.font.name = 'Arial'
 
 
 
 
   # Cláusula Segunda
 
-  title3 = doc.add_heading(level=1)
-  title3.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title3.add_run("CLÁUSULA SEGUNDA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    title3 = doc.add_heading(level=1)
+    title3.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    run = title3.add_run("CLÁUSULA SEGUNDA")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
-  c2 = doc.add_paragraph()
-  c2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c2.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    c2 = doc.add_paragraph()
+    c2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = c2.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  c22 = c2.add_run('\nA ')
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run(empresa)
-  c22.bold = True
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run(' concorda em receber a importância de ')
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run(valor)
-  c22.bold = True
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run(valor_monetario_por_extenso)
-  c22.bold = True
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run('.')
-  c22.bold = True
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
+    c22 = c2.add_run('\nA ')
+    c22.font.size = Pt(11)
+    c22.font.name = 'Arial'
+    c22 = c2.add_run(empresa)
+    c22.bold = True
+    c22.font.size = Pt(11)
+    c22.font.name = 'Arial'
+    c22 = c2.add_run(' concorda em receber a importância de ')
+    c22.font.size = Pt(11)
+    c22.font.name = 'Arial'
+    c22 = c2.add_run(valor)
+    c22.bold = True
+    c22.font.size = Pt(11)
+    c22.font.name = 'Arial'
+    c22 = c2.add_run(valor_monetario_por_extenso)
+    c22.bold = True
+    c22.font.size = Pt(11)
+    c22.font.name = 'Arial'
+    c22 = c2.add_run('.')
+    c22.bold = True
+    c22.font.size = Pt(11)
+    c22.font.name = 'Arial'
 
 
   # Cláusula Terceira
 
-  title3 = doc.add_heading(level=1)
-  title3.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  paragraph_format = title3.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    title3 = doc.add_heading(level=1)
+    title3.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    paragraph_format = title3.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  run = title3.add_run("CLÁUSULA TERCEIRA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    run = title3.add_run("CLÁUSULA TERCEIRA")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
-  c3 = doc.add_paragraph()
-  c3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c3.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    c3 = doc.add_paragraph()
+    c3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = c3.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  c33 = c3.add_run('Com o recebimento da importância estipulada na Cláusula Segunda, a ')
-  c33.font.size = Pt(11)
-  c33.font.name = 'Arial'
-  c33 = c3.add_run(empresa)
-  c33.bold = True
-  c33.font.size = Pt(11)
-  c33.font.name = 'Arial'
-  c33 = c3.add_run('. dá ao MUNICÍPIO Quitação plena, rasa, geral e irrevogável com relação a qualquer direito creditório originário do que ficou estipulado na Cláusula Primeira, eventuais juros devidos, correção monetária incidente sobre a importância paga quitada, reajustamento de preço, encargos sociais ou fiscais, ou quaisquer valores financeiros doutra forma vinculados ao ajustado na Cláusula Primeira.')
-  c33.font.size = Pt(11)
-  c33.font.name = 'Arial'
+    c33 = c3.add_run('Com o recebimento da importância estipulada na Cláusula Segunda, a ')
+    c33.font.size = Pt(11)
+    c33.font.name = 'Arial'
+    c33 = c3.add_run(empresa)
+    c33.bold = True
+    c33.font.size = Pt(11)
+    c33.font.name = 'Arial'
+    c33 = c3.add_run('. dá ao MUNICÍPIO Quitação plena, rasa, geral e irrevogável com relação a qualquer direito creditório originário do que ficou estipulado na Cláusula Primeira, eventuais juros devidos, correção monetária incidente sobre a importância paga quitada, reajustamento de preço, encargos sociais ou fiscais, ou quaisquer valores financeiros doutra forma vinculados ao ajustado na Cláusula Primeira.')
+    c33.font.size = Pt(11)
+    c33.font.name = 'Arial'
 
   # Cláusula Quarta
 
-  title4 = doc.add_paragraph()
-  title4.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title4.add_run("CLÁUSULA QUARTA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.bold = True
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    title4 = doc.add_paragraph()
+    title4.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    run = title4.add_run("CLÁUSULA QUARTA")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.bold = True
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
-  c4 = doc.add_paragraph()
-  c4.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c4.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    c4 = doc.add_paragraph()
+    c4.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = c4.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  c44 = c4.add_run(empenho)
-  c44.font.size = Pt(11)
-  c44.font.name = 'Arial'
-  c44 = c4.add_run('.')
-  c44.font.size = Pt(11)
-  c44.font.name = 'Arial'
+    c44 = c4.add_run(empenho)
+    c44.font.size = Pt(11)
+    c44.font.name = 'Arial'
+    c44 = c4.add_run('.')
+    c44.font.size = Pt(11)
+    c44.font.name = 'Arial'
 
 
   # Cláusula Quinta
 
-  title5 = doc.add_heading(level=1)
-  title5.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  paragraph_format = title5.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    title5 = doc.add_heading(level=1)
+    title5.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    paragraph_format = title5.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  run = title5.add_run("CLÁUSULA QUINTA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    run = title5.add_run("CLÁUSULA QUINTA")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
-  c5 = doc.add_paragraph()
-  c5.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c5.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    c5 = doc.add_paragraph()
+    c5.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = c5.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  c55 = c5.add_run('Dentro do prazo de 20 (vinte) dias a contar da assinatura, o presente TERMO deverá ser publicado em extrato, no Boletim Oficial do Município de Duque de Caxias, a expensas do MUNICÍPIO.')
-  c55.font.size = Pt(11)
-  c55.font.name = 'Arial'
+    c55 = c5.add_run('Dentro do prazo de 20 (vinte) dias a contar da assinatura, o presente TERMO deverá ser publicado em extrato, no Boletim Oficial do Município de Duque de Caxias, a expensas do MUNICÍPIO.')
+    c55.font.size = Pt(11)
+    c55.font.name = 'Arial'
 
 
-  doc.add_page_break()
+    doc.add_page_break()
 
 
   # Terceira Página
 
-
-  # Cláusula Sexta
-
-  title6 = doc.add_heading(level=1)
-  title6.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title6.add_run("\n\n\nCLÁUSULA SEXTA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  c6 = doc.add_paragraph()
-  c6.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c6.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  c66 = c6.add_run('\nO MUNICÍPIO providenciará, até o 5º (quinto) dia útil seguinte ao de sua assinatura, o encaminhamento de cópia autenticada do presente instrumento ao Tribunal de Contas do Estado do Rio de Janeiro e à Controladoria Geral do Município.')
-  c66.font.size = Pt(11)
-  c66.font.name = 'Arial'
-
-  # Cláusula Sétima
-
-  title7 = doc.add_heading(level=1)
-  title7.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title7.add_run("CLÁUSULA SÉTIMA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  c7 = doc.add_paragraph()
-  c7.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c7.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  c77 = c7.add_run('\nO MUNICÍPIO não se responsabiliza por indenização de qualquer natureza em decorrência de atos ou fatos vinculados à fiscalização e controle da execução orçamentária e da administração financeira.')
-  c77.font.size = Pt(11)
-  c77.font.name = 'Arial'
-
-  # Cláusula Oitava
-
-  title8 = doc.add_paragraph()
-  title8.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title8.add_run("CLÁUSULA OITAVA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.bold = True
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  c8 = doc.add_paragraph()
-  c8.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c8.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  c88 = c8.add_run('Fica eleito para o Foro da Comarca do Município de Duque de Caxias, para dirimir quaisquer dúvidas ou litígios oriundos do presente TERMO.')
-  c88.font.size = Pt(11)
-  c88.font.name = 'Arial'
-
-
-
-  # Conclusão
-
-  conclusão = doc.add_paragraph()
-  conclusão.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = conclusão.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  conclusão2 = conclusão.add_run('E, por estarem assim ajustados, é lavrado o presente ')
-  conclusão2.font.size = Pt(11)
-  conclusão2.font.name = 'Arial'
-  conclusão2 = conclusão.add_run('TERMO DE AJUSTE DE CONTAS')
-  conclusão2.font.size = Pt(11)
-  conclusão2.font.name = 'Arial'
-  conclusão2.bold = True
-  conclusão2 = conclusão.add_run(', que vai assinado pelas partes em 2 (duas) vias de igual teor e validade.')
-  conclusão2.font.size = Pt(11)
-  conclusão2.font.name = 'Arial'
-
-  # Cidade e Data
-
-  cd = doc.add_paragraph()
-  cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  cd1 = cd.add_run('\nDuque de Caxias, ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(dia)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(nome_mes)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(ano)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run('.')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-
-  # Secretária
-
-  contratado = doc.add_paragraph()
-
-  contratado1 = contratado.add_run("\n\n___________________________")
-  contratado1.font.color.rgb = RGBColor(0, 0, 0)
-  contratado1.font.size = Pt(11)
-  contratado1.font.name = 'Arial'
-
-
-  contratado1 = contratado.add_run("\nSecretária Municipal de Saúde")
-  contratado1.font.color.rgb = RGBColor(0, 0, 0)
-  contratado1.font.size = Pt(11)
-  contratado1.font.name = 'Arial'
-
-  contratado.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-
-  # Contratado
-
-  assinatura = doc.add_paragraph()
-
-  assinatura1 = assinatura.add_run("\n\n___________________________")
-  assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-  assinatura1.font.size = Pt(11)
-  assinatura1.font.name = 'Arial'
-
-  assinatura2 = assinatura.add_run("\nContratado ")
-  assinatura2.font.color.rgb = RGBColor(0, 0, 0)
-  assinatura2.font.size = Pt(11)
-  assinatura2.font.name = 'Arial'
-  assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-  assinatura2.font.size = Pt(11)
-  assinatura2.font.name = 'Arial'
-
-
-  doc.add_page_break()
-
-
-  # Quarta Página
-
-# Extrato do Termo de Ajuste de Contas
-
-  ext = doc.add_heading(level=1)
-  ext1 = ext.add_run("\n\n\nEXTRATO DO TERMO DE AJUSTE DE CONTAS")
-  ext1.font.color.rgb = RGBColor(0, 0, 0)
-  ext1.font.underline = True
-  ext1.font.size = Pt(11)
-  ext1.font.name = 'Arial'
-  ext.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-
-# Espécie
-
-  ext2 = doc.add_heading(level=1)
-  ext2.alignment = WD_ALIGN_PARAGRAPH.LEFT
-  paragraph_format = ext2.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  ext1 = ext2.add_run("ESPÉCIE:")
-  ext1.font.color.rgb = RGBColor(0, 0, 0)
-  ext1.font.size = Pt(11)
-  ext1.font.name = 'Arial'
-
-
-  especies = doc.add_paragraph()
-  especies.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = especies.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  especies1 = especies.add_run(f'Termo de Ajuste de Contas nº ')
-  especies1.font.size = Pt(11)
-  especies1.font.name = 'Arial'
-
-  especie1 = especies.add_run(f'{TAC}/{ano_REC}')
-  especie1.bold = True
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-
-  especie1 = especies.add_run(f', encartado às fls ')
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(Fls)
-  especie1.bold = True
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(', especificado no ')
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(f'Livro nº 02/{ano_REC}/SMS')
-  especie1.bold = True
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(', conforme procedimento administrativo nº ')
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(processo)
-  especie1.bold = True
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-
-  especie1 = especies.add_run('.')
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-
-
-
-# Partes
-
-  ext3 = doc.add_heading(level=1)
-
-  ext33 = ext3.add_run("PARTES:")
-  ext33.font.color.rgb = RGBColor(0, 0, 0)
-  ext33.font.size = Pt(11)
-  ext33.font.name = 'Arial'
-  ext33.alignment = WD_ALIGN_PARAGRAPH.LEFT
-  paragraph_format = ext3.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  parte = doc.add_paragraph()
-  parte.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = parte.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  partes = parte.add_run('O Município de Duque de Caxias, por meio da Secretaria Municipal de Saúde e ')
-  partes.font.size = Pt(11)
-  partes.font.name = 'Arial'
-  partes = parte.add_run(empresa)
-  partes.bold = True
-  partes.font.size = Pt(11)
-  partes.font.name = 'Arial'
-  partes = parte.add_run('.')
-
-
-
-# Objeto
-
-  obj = doc.add_heading(level=1)
-
-  obj1 = obj.add_run("OBJETO:")
-  obj1.font.color.rgb = RGBColor(0, 0, 0)
-  obj1.font.size = Pt(11)
-  obj1.font.name = 'Arial'
-  obj.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = obj.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  objeto = doc.add_paragraph()
-  objeto.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = objeto.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  objeto1 = objeto.add_run('O presente TERMO tem por objeto a liquidação e o pagamento da importância de ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(valor)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(valor_monetario_por_extenso)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(', reconhecida a dívida pelo MUNICÍPIO em favor de ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(empresa)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(' associados ao objeto de ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(servico)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(', referente ao período de ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(periodo)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(', para atender as necessidades da Secretaria Municipal de Saúde, em conformidade com as especificações constantes no Procedimento Administrativo nº ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(processo)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run('.')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-
-
-
-# Cidade e Data
-
-  cd = doc.add_paragraph()
-  cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  cd1 = cd.add_run('\nDuque de Caxias, ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(dia)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(nome_mes)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(ano)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run('.')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-
-
-# Secretaria
-  assinatura = doc.add_paragraph()
-  assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-  paragraph_format = assinatura.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-
-  assinatura1 = assinatura.add_run("\n\n\nCélia Serrano da Silva ")
-  assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-  assinatura1.font.all_caps = True
-  assinatura1.bold = True
-  assinatura1.font.size = Pt(11)
-  assinatura1.font.name = 'Arial'
-
-  assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(11)
-  assinaturasec.font.name = 'Arial'
-
-  assinaturasec = assinatura.add_run("\nMat. 23098-0")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(11)
-  assinaturasec.font.name = 'Arial'
-
-
-# Nome do arquivo
-
-  nome_arquivo = processo.replace('/','.')
-  nome_do_arquivo = str(TAC + ' - ' + nome_arquivo)
-
-
-  end_time = time.time()
-
-
-
-# Salva o documento
-  doc.save(f'/content/drive/MyDrive/TAC E REC - 2024/TAC - 2024/TAC {nome_do_arquivo}.docx')
-  print(f"TAC {TAC} gerado para processo nº {processo} com sucesso!")
-execution_time = end_time - start_time
-print(f"Tempo de execução: {execution_time} segundos")
-
-"""# REC"""
-
-from docx import Document
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.shared import Pt, RGBColor, Inches
-from docx.oxml.ns import qn
-from datetime import datetime
-import time
-import pandas as pd
-from google.colab import auth
-from google.auth import default
-import gspread
-from num2words import num2words
-
-start_time = time.time()
-
-# Authenticate user and authorize access to Google Sheets
-auth.authenticate_user()
-creds, _ = default()
-gc = gspread.authorize(creds)
-
-# Open the Google Sheet by its title
-sheet_title = 'Dados TAC'  # Replace with your actual Google Sheet title
-sheet = gc.open('Dados TAC').get_worksheet(1)
-
-# Convertendo planilha em Data Frame
-tabela = pd.DataFrame(sheet.get_all_records())
-
-for index, row in tabela.iterrows():
-  doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
-
-  section = doc.sections[0]
-  section.left_margin = Inches(0.8)
-  section.right_margin = Inches(0.8)
-
-
-  # Valor Monetário por extenso
-
-  valor_texto = row["Valor"]
-  valor_numerico = valor_texto.replace(",", ".").replace(".","")
-  valor_numerico = valor_numerico.replace("$","")
-  valor_numerico = int(valor_numerico)
-  valor_numerico = valor_numerico / 100
-
-
-  def valor_monetario_por_extenso(valor_numerico):
-
-      # Separar a parte inteira e decimal do valor
-      reais, centavos = divmod(valor_numerico, 1)
-      centavos = round(centavos * 100)
-
-      # Converter a parte inteira para extenso
-      reais = num2words(reais, lang='pt_BR')
-
-      # Converter a parte decimal para extenso
-      centavos = num2words(centavos, lang='pt_BR')
-
-      if centavos == 'zero':
-        extenso_final = f'{reais} reais'
-      else: # Assign a value to extenso_final when centavos is not zero
-        extenso_final = f'{reais} reais e {centavos} centavos'
-
-      return extenso_final
-
-
-  # Informaões do Termo
-
-  processo = row["Processo"]
-  TAC = str(row['REC'])
-  ano_REC = str(row['Ano'])
-  Fls = row['Fls']
-
-  valor = row["Valor"]
-  valor = 'R' + valor
-  valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
-  valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
-
-  periodo = row["Período"]
-  empenho =  row["Empenho"]
-  CNPJ = row["CNPJ"]
-  empresa = row["Nome da empresa"]
-  CPF = row["CPF"]
-  endereco = row["endereco"]
-  Nome_socio = row['Nome sócio']
-  interessado = row['Interessado']
-  servico = row['Objeto']
-
-  # Data
-
-  dia = str(datetime.now().strftime("%d"))
-  mes_atual = datetime.now().month
-  meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-  nome_mes = meses[mes_atual - 1]
-  ano = str(datetime.now().year)
-
-
-  # Primeira página
-
-  titlet = doc.add_heading(level=1)
-
-  paragraph_format = titlet.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  run = titlet.add_run("TERMO DE RECONHECIMENTO DE DÍVIDA\n")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.underline = True
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  run = titlet.add_run(f"\nLivro: 001/{ano_REC}")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-
-  run = titlet.add_run(f"\nTermo {TAC}/{ano_REC}")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  run = titlet.add_run(f"\nFls: {Fls}\n")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  run = titlet.add_run(f"\nTERMO DE RECONHECIMENTO DE DÍVIDA QUE ENTRE SI\nCELEBRAM O MUNICÍPIO DE DUQUE DE CAXIAS,\nATRAVÉS DA SECRETARIA MUNICIPAL DE SAÚDE,\n {empresa} NA FORMA ABAIXO:")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  run.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  titlet.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run.font.color.rgb = RGBColor(0, 0, 0)
-
-
-  run.font.all_caps = True
-  run.bold = True
-
-
-  # Data
-  paragrafo = doc.add_paragraph()
-  paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = paragrafo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  paragrafo4 = paragrafo.add_run('\nAos ')
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(dia)
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(' de ')
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(nome_mes)
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(' de ')
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-  paragrafo4 = paragrafo.add_run(ano)
-  paragrafo4.bold = True
-  paragrafo4.font.size = Pt(11)
-  paragrafo4.font.name = 'Arial'
-
-  #Texto
-  paragrafo5 = paragrafo.add_run(", o Município de Duque de Caxias, inscrito no CNPJ sob o nº ")
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-
-  paragrafo5 = paragrafo.add_run('29.138.328/0001-50')
-  paragrafo5.bold = True
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-
-  paragrafo5 = paragrafo.add_run(', com endereço na Alameda Dona Esmeralda nº 206, RJ, doravante denominado MUNICÍPIO, neste ato representado pelo Excelentíssimo Senhor Prefeito Wilson Miguel dos Reis, brasileiro, casado, portador da carteira de identidade nº 910.645.077, expedida pelo IFP/RJ e inscrito no CPF/ MF sob o nº 311.163.537-68, residente nesta cidade, que delega competência através da Lei Municipal nº 2.825 de 06 de Janeiro de 2017, ao ilmo. Secretária Municipal de Saúde, ')
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-
-
-  paragrafo5 = paragrafo.add_run('Dra Célia Serrano da Silva')
-  paragrafo5.bold = True
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-
-  paragrafo5 = paragrafo.add_run(', brasileira, médica, portadora da carteira de identidade nº 2405860 expedida pelo SSP (PA) e inscrito no CPF sob o nº ')
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-  paragrafo5 = paragrafo.add_run('392.515.002-15')
-  paragrafo5.bold = True
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-  paragrafo5 = paragrafo.add_run(', de outro lado, ')
-  paragrafo5.font.size = Pt(11)
-  paragrafo5.font.name = 'Arial'
-
-  # Empresa
-  paragrafo2 = paragrafo.add_run(empresa)
-  paragrafo2.bold = True
-  paragrafo2.font.all_caps = True
-  paragrafo2.font.size = Pt(11)
-  paragrafo2.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(', doravante denominada CONTRATADA, pessoa jurídica de direito privado, com endereço, ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(endereco)
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(', devidamente inscrita no CNPJ sob nº ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(CNPJ)
-  paragrafo3.bold = True
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-
-  # Interessado
-  paragrafo3 = paragrafo.add_run(f' neste ato representada pelo ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(Nome_socio)
-  paragrafo3.bold = True
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(', devidamente inscrito no CPF nº ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3 = paragrafo.add_run(CPF)
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo3.bold = True
-  paragrafo3 = paragrafo.add_run(f', {interessado}')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-
-
-  # Processo
-  paragrafo3 = paragrafo.add_run(', quando em conjunto denominadas as PARTES, tendo em vista o constante e decidido no Processo Administrativo de nº ')
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-  paragrafo2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragrafo3 = paragrafo.add_run(processo)
-  paragrafo3.bold = True
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-
-  # Texto Fim
-  paragrafo3 = paragrafo.add_run(', firmam o presente TERMO que se regerá incondicional e irrestritamente pela legislação específica Federal, mediante as seguintes cláusulas e condições:')
-  paragrafo3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragrafo3.font.size = Pt(11)
-  paragrafo3.font.name = 'Arial'
-
-  title = 1.5  # Espaçamento de 1.5 vezes o tamanho da fonte
-  title = WD_LINE_SPACING.MULTIPLE
-  title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-
-  # Centraliza o título
-  title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-
-  doc.add_page_break()
-
-
-  # Segunda Página
-
-
-  # Cláusula Primeira
-
-  title2 = doc.add_heading(level=1)
-  title2.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title2.add_run("\n\nCLÁUSULA PRIMEIRA\n")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  c1 = doc.add_paragraph()
-  c1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c1.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-  c11 = c1.add_run('O presente TERMO tem por objetivo a liquidação e o pagamento da importância de ')
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run(valor)
-  c11.bold = True
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run(valor_monetario_por_extenso)
-  c11.bold = True
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run('. Reconhecida a dívida pelo MUNICÍPIO em favor de ')
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run(empresa)
-  c11.bold = True
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-  c11 = c1.add_run('.')
-  c11.font.size = Pt(11)
-  c11.font.name = 'Arial'
-
-
-
-
-  # Cláusula Segunda
-
-  title3 = doc.add_heading(level=1)
-  title3.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title3.add_run("CLÁUSULA SEGUNDA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  c2 = doc.add_paragraph()
-  c2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c2.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  c22 = c2.add_run('\nA ')
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run(empresa)
-  c22.bold = True
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run(' concorda em receber a importância de ')
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run(valor)
-  c22.bold = True
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run(valor_monetario_por_extenso)
-  c22.bold = True
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-  c22 = c2.add_run('.')
-  c22.bold = True
-  c22.font.size = Pt(11)
-  c22.font.name = 'Arial'
-
-
-  # Cláusula Terceira
-
-  title3 = doc.add_heading(level=1)
-  title3.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  paragraph_format = title3.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  run = title3.add_run("CLÁUSULA TERCEIRA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  c3 = doc.add_paragraph()
-  c3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c3.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  c33 = c3.add_run('Com o recebimento da importância estipulada na Cláusula Segunda, a ')
-  c33.font.size = Pt(11)
-  c33.font.name = 'Arial'
-  c33 = c3.add_run(empresa)
-  c33.bold = True
-  c33.font.size = Pt(11)
-  c33.font.name = 'Arial'
-  c33 = c3.add_run('. dá ao MUNICÍPIO Quitação plena, rasa, geral e irrevogável com relação a qualquer direito creditório originário do que ficou estipulado na Cláusula Primeira, eventuais juros devidos, correção monetária incidente sobre a importância paga quitada, reajustamento de preço, encargos sociais ou fiscais, ou quaisquer valores financeiros doutra forma vinculados ao ajustado na Cláusula Primeira.')
-  c33.font.size = Pt(11)
-  c33.font.name = 'Arial'
-
-  # Cláusula Quarta
-
-  title4 = doc.add_paragraph()
-  title4.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title4.add_run("CLÁUSULA QUARTA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.bold = True
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  c4 = doc.add_paragraph()
-  c4.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c4.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  c44 = c4.add_run(empenho)
-  c44.font.size = Pt(11)
-  c44.font.name = 'Arial'
-  c44 = c4.add_run('.')
-  c44.font.size = Pt(11)
-  c44.font.name = 'Arial'
-
-
-  # Cláusula Quinta
-
-  title5 = doc.add_heading(level=1)
-  title5.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  paragraph_format = title5.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  run = title5.add_run("CLÁUSULA QUINTA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
-
-  c5 = doc.add_paragraph()
-  c5.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c5.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  c55 = c5.add_run('Dentro do prazo de 20 (vinte) dias a contar da assinatura, o presente TERMO deverá ser publicado em extrato, no Boletim Oficial do Município de Duque de Caxias, a expensas do MUNICÍPIO.')
-  c55.font.size = Pt(11)
-  c55.font.name = 'Arial'
-
-
-  doc.add_page_break()
-
-
-  # Terceira Página
+    folha = folha + 1
+    paragrafo_inicial = doc.add_paragraph('')
+    paragrafo1 = paragrafo_inicial.add_run(f'\nProcesso n° {processo} FL {folha}')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+    paragrafo_inicial.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+    paragraph_format = paragrafo_inicial.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
 
   # Cláusula Sexta
 
-  title6 = doc.add_heading(level=1)
-  title6.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title6.add_run("\n\n\nCLÁUSULA SEXTA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    title6 = doc.add_heading(level=1)
+    title6.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    run = title6.add_run("CLÁUSULA SEXTA")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
-  c6 = doc.add_paragraph()
-  c6.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c6.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    c6 = doc.add_paragraph()
+    c6.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = c6.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  c66 = c6.add_run('\nO MUNICÍPIO providenciará, até o 5º (quinto) dia útil seguinte ao de sua assinatura, o encaminhamento de cópia autenticada do presente instrumento ao Tribunal de Contas do Estado do Rio de Janeiro e à Controladoria Geral do Município.')
-  c66.font.size = Pt(11)
-  c66.font.name = 'Arial'
+    c66 = c6.add_run('\nO MUNICÍPIO providenciará, até o 5º (quinto) dia útil seguinte ao de sua assinatura, o encaminhamento de cópia autenticada do presente instrumento ao Tribunal de Contas do Estado do Rio de Janeiro e à Controladoria Geral do Município.')
+    c66.font.size = Pt(11)
+    c66.font.name = 'Arial'
 
   # Cláusula Sétima
 
-  title7 = doc.add_heading(level=1)
-  title7.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title7.add_run("CLÁUSULA SÉTIMA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    title7 = doc.add_heading(level=1)
+    title7.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    run = title7.add_run("CLÁUSULA SÉTIMA")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
-  c7 = doc.add_paragraph()
-  c7.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c7.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    c7 = doc.add_paragraph()
+    c7.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = c7.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  c77 = c7.add_run('\nO MUNICÍPIO não se responsabiliza por indenização de qualquer natureza em decorrência de atos ou fatos vinculados à fiscalização e controle da execução orçamentária e da administração financeira.')
-  c77.font.size = Pt(11)
-  c77.font.name = 'Arial'
+    c77 = c7.add_run('\nO MUNICÍPIO não se responsabiliza por indenização de qualquer natureza em decorrência de atos ou fatos vinculados à fiscalização e controle da execução orçamentária e da administração financeira.')
+    c77.font.size = Pt(11)
+    c77.font.name = 'Arial'
+
 
   # Cláusula Oitava
 
-  title8 = doc.add_paragraph()
-  title8.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-  run = title8.add_run("CLÁUSULA OITAVA")
-  run.font.color.rgb = RGBColor(0, 0, 0)
-  run.bold = True
-  run.font.size = Pt(11)
-  run.font.name = 'Arial'
+    title8 = doc.add_paragraph()
+    title8.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    run = title8.add_run("CLÁUSULA OITAVA")
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.bold = True
+    run.font.size = Pt(11)
+    run.font.name = 'Arial'
 
-  c8 = doc.add_paragraph()
-  c8.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = c8.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    c8 = doc.add_paragraph()
+    c8.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = c8.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  c88 = c8.add_run('Fica eleito para o Foro da Comarca do Município de Duque de Caxias, para dirimir quaisquer dúvidas ou litígios oriundos do presente TERMO.')
-  c88.font.size = Pt(11)
-  c88.font.name = 'Arial'
-
+    c88 = c8.add_run('Fica eleito para o Foro da Comarca do Município de Duque de Caxias, para dirimir quaisquer dúvidas ou litígios oriundos do presente TERMO.')
+    c88.font.size = Pt(11)
+    c88.font.name = 'Arial'
 
 
   # Conclusão
 
-  conclusão = doc.add_paragraph()
-  conclusão.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = conclusão.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    conclusão = doc.add_paragraph()
+    conclusão.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = conclusão.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  conclusão2 = conclusão.add_run('E, por estarem assim ajustados, é lavrado o presente ')
-  conclusão2.font.size = Pt(11)
-  conclusão2.font.name = 'Arial'
-  conclusão2 = conclusão.add_run('TERMO DE RECONHECIMENTO DE DÍVIDA')
-  conclusão2.font.size = Pt(11)
-  conclusão2.font.name = 'Arial'
-  conclusão2.bold = True
-  conclusão2 = conclusão.add_run(', que vai assinado pelas partes em 2 (duas) vias de igual teor e validade.')
-  conclusão2.font.size = Pt(11)
-  conclusão2.font.name = 'Arial'
+    conclusão2 = conclusão.add_run('E, por estarem assim ajustados, é lavrado o presente ')
+    conclusão2.font.size = Pt(11)
+    conclusão2.font.name = 'Arial'
+    conclusão2 = conclusão.add_run(termo)
+    conclusão2.font.size = Pt(11)
+    conclusão2.font.name = 'Arial'
+    conclusão2.bold = True
+    conclusão2 = conclusão.add_run(', que vai assinado pelas partes em 2 (duas) vias de igual teor e validade.')
+    conclusão2.font.size = Pt(11)
+    conclusão2.font.name = 'Arial'
+
 
   # Cidade e Data
 
-  cd = doc.add_paragraph()
-  cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  cd1 = cd.add_run('\nDuque de Caxias, ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(dia)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(nome_mes)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(ano)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run('.')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\nDuque de Caxias, ')
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+
 
   # Secretária
 
-  contratado = doc.add_paragraph()
+    contratado = doc.add_paragraph()
 
-  contratado1 = contratado.add_run("\n\n___________________________")
-  contratado1.font.color.rgb = RGBColor(0, 0, 0)
-  contratado1.font.size = Pt(11)
-  contratado1.font.name = 'Arial'
+    contratado1 = contratado.add_run("\n\n___________________________")
+    contratado1.font.color.rgb = RGBColor(0, 0, 0)
+    contratado1.font.size = Pt(11)
+    contratado1.font.name = 'Arial'
 
 
-  contratado1 = contratado.add_run("\nSecretária Municipal de Saúde")
-  contratado1.font.color.rgb = RGBColor(0, 0, 0)
-  contratado1.font.size = Pt(11)
-  contratado1.font.name = 'Arial'
+    contratado1 = contratado.add_run("\nSecretária Municipal de Saúde")
+    contratado1.font.color.rgb = RGBColor(0, 0, 0)
+    contratado1.font.size = Pt(11)
+    contratado1.font.name = 'Arial'
 
-  contratado.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    contratado.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 
   # Contratado
 
-  assinatura = doc.add_paragraph()
+    assinatura = doc.add_paragraph()
 
-  assinatura1 = assinatura.add_run("\n\n___________________________")
-  assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-  assinatura1.font.size = Pt(11)
-  assinatura1.font.name = 'Arial'
+    assinatura1 = assinatura.add_run("\n\n___________________________")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.font.size = Pt(11)
+    assinatura1.font.name = 'Arial'
 
-  assinatura2 = assinatura.add_run("\nContratado ")
-  assinatura2.font.color.rgb = RGBColor(0, 0, 0)
-  assinatura2.font.size = Pt(11)
-  assinatura2.font.name = 'Arial'
-  assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-  assinatura2.font.size = Pt(11)
-  assinatura2.font.name = 'Arial'
+    assinatura2 = assinatura.add_run("\nContratado ")
+    assinatura2.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura2.font.size = Pt(11)
+    assinatura2.font.name = 'Arial'
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    assinatura2.font.size = Pt(11)
+    assinatura2.font.name = 'Arial'
 
 
-  doc.add_page_break()
+    doc.add_page_break()
 
 
   # Quarta Página
 
-  # Extrato do Termo de Ajuste de Contas
-  ext = doc.add_heading(level=1)
-  ext1 = ext.add_run("\n\n\nEXTRATO DO TERMO DE RECONHECIMENTO DE DÍVIDA")
-  ext1.font.color.rgb = RGBColor(0, 0, 0)
-  ext1.font.underline = True
-  ext1.font.size = Pt(11)
-  ext1.font.name = 'Arial'
-  ext.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    folha = folha + 1
+    paragrafo_inicial = doc.add_paragraph('')
+    paragrafo1 = paragrafo_inicial.add_run(f'\nProcesso n° {processo} FL {folha}')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+    paragrafo_inicial.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+    paragraph_format = paragrafo_inicial.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+
+  # Extrato do Termo
+
+
+    ext = doc.add_heading(level=1)
+    ext1 = ext.add_run(f"EXTRATO DO {termo}")
+    ext1.font.color.rgb = RGBColor(0, 0, 0)
+    ext1.font.underline = True
+    ext1.font.size = Pt(11)
+    ext1.font.name = 'Arial'
+    ext.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 
   # Espécie
-  ext2 = doc.add_heading(level=1)
-  ext2.alignment = WD_ALIGN_PARAGRAPH.LEFT
-  paragraph_format = ext2.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  ext1 = ext2.add_run("ESPÉCIE:")
-  ext1.font.color.rgb = RGBColor(0, 0, 0)
-  ext1.font.size = Pt(11)
-  ext1.font.name = 'Arial'
+    ext2 = doc.add_heading(level=1)
+    ext2.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph_format = ext2.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    ext1 = ext2.add_run("ESPÉCIE:")
+    ext1.font.color.rgb = RGBColor(0, 0, 0)
+    ext1.font.size = Pt(11)
+    ext1.font.name = 'Arial'
 
 
-  especies = doc.add_paragraph()
-  especies.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = especies.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    especies = doc.add_paragraph()
+    especies.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = especies.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  especies1 = especies.add_run(f'Termo de Reconhecimento de Dívida nº ')
-  especies1.font.size = Pt(11)
-  especies1.font.name = 'Arial'
+    especies1 = especies.add_run(f'{termo} ')
+    especies1.font.size = Pt(11)
+    especies1.font.name = 'Arial'
+    especies1.bold = True
 
-  especie1 = especies.add_run(f'{TAC}/{ano_REC}')
-  especie1.bold = True
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
+    especies1 = especies.add_run('n° ')
+    especies1.font.size = Pt(11)
+    especies1.font.name = 'Arial'
 
-  especie1 = especies.add_run(f', encartado às fls ')
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(Fls)
-  especie1.bold = True
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(', especificado no ')
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(f'Livro nº 01/{ano_REC}/SMS')
-  especie1.bold = True
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(', conforme procedimento administrativo nº ')
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
-  especie1 = especies.add_run(processo)
-  especie1.bold = True
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
 
-  especie1 = especies.add_run('.')
-  especie1.font.size = Pt(11)
-  especie1.font.name = 'Arial'
+    especie1 = especies.add_run(f'{n_termo}/{ano_termo}')
+    especie1.bold = True
+    especie1.font.size = Pt(11)
+    especie1.font.name = 'Arial'
+
+    especie1 = especies.add_run(f', encartado às fls ')
+    especie1.font.size = Pt(11)
+    especie1.font.name = 'Arial'
+    especie1 = especies.add_run(Fls)
+    especie1.bold = True
+    especie1.font.size = Pt(11)
+    especie1.font.name = 'Arial'
+    especie1 = especies.add_run(', especificado no ')
+    especie1.font.size = Pt(11)
+    especie1.font.name = 'Arial'
+    especie1 = especies.add_run(f'Livro nº {livro}/{ano_termo}/SMS')
+    especie1.bold = True
+    especie1.font.size = Pt(11)
+    especie1.font.name = 'Arial'
+    especie1 = especies.add_run(', conforme procedimento administrativo nº ')
+    especie1.font.size = Pt(11)
+    especie1.font.name = 'Arial'
+    especie1 = especies.add_run(processo)
+    especie1.bold = True
+    especie1.font.size = Pt(11)
+    especie1.font.name = 'Arial'
+
+    especie1 = especies.add_run('.')
+    especie1.font.size = Pt(11)
+    especie1.font.name = 'Arial'
 
 
 
   # Partes
-  ext3 = doc.add_heading(level=1)
 
-  ext33 = ext3.add_run("PARTES:")
-  ext33.font.color.rgb = RGBColor(0, 0, 0)
-  ext33.font.size = Pt(11)
-  ext33.font.name = 'Arial'
-  ext33.alignment = WD_ALIGN_PARAGRAPH.LEFT
-  paragraph_format = ext3.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    ext3 = doc.add_heading(level=1)
 
-  parte = doc.add_paragraph()
-  parte.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = parte.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    ext33 = ext3.add_run("PARTES:")
+    ext33.font.color.rgb = RGBColor(0, 0, 0)
+    ext33.font.size = Pt(11)
+    ext33.font.name = 'Arial'
+    ext33.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph_format = ext3.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  partes = parte.add_run('O Município de Duque de Caxias, por meio da Secretaria Municipal de Saúde e ')
-  partes.font.size = Pt(11)
-  partes.font.name = 'Arial'
-  partes = parte.add_run(empresa)
-  partes.bold = True
-  partes.font.size = Pt(11)
-  partes.font.name = 'Arial'
-  partes = parte.add_run('.')
+    parte = doc.add_paragraph()
+    parte.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = parte.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    partes = parte.add_run('O Município de Duque de Caxias, por meio da Secretaria Municipal de Saúde e ')
+    partes.font.size = Pt(11)
+    partes.font.name = 'Arial'
+    partes = parte.add_run(empresa)
+    partes.bold = True
+    partes.font.size = Pt(11)
+    partes.font.name = 'Arial'
+    partes = parte.add_run('.')
 
 
 
   # Objeto
-  obj = doc.add_heading(level=1)
 
-  obj1 = obj.add_run("OBJETO:")
-  obj1.font.color.rgb = RGBColor(0, 0, 0)
-  obj1.font.size = Pt(11)
-  obj1.font.name = 'Arial'
-  obj.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = obj.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    obj = doc.add_heading(level=1)
 
-  objeto = doc.add_paragraph()
-  objeto.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = objeto.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    obj1 = obj.add_run("OBJETO:")
+    obj1.font.color.rgb = RGBColor(0, 0, 0)
+    obj1.font.size = Pt(11)
+    obj1.font.name = 'Arial'
+    obj.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = obj.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  objeto1 = objeto.add_run('O presente TERMO tem por objeto a liquidação e o pagamento da importância de ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(valor)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(valor_monetario_por_extenso)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(', reconhecida a dívida pelo MUNICÍPIO em favor de ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(empresa)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(' associados ao objeto de ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(servico)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(', referente ao período de ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(periodo)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(', para atender as necessidades da Secretaria Municipal de Saúde, em conformidade com as especificações constantes no Procedimento Administrativo nº ')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run(processo)
-  objeto1.bold = True
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1 = objeto.add_run('.')
-  objeto1.font.size = Pt(11)
-  objeto1.font.name = 'Arial'
-  objeto1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    objeto = doc.add_paragraph()
+    objeto.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = objeto.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    objeto1 = objeto.add_run('O presente TERMO tem por objeto a liquidação e o pagamento da importância de ')
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(valor)
+    objeto1.bold = True
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(valor_monetario_por_extenso)
+    objeto1.bold = True
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(', reconhecida a dívida pelo MUNICÍPIO em favor de ')
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(empresa)
+    objeto1.bold = True
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(' associados ao objeto de ')
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(servico)
+    objeto1.bold = True
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(', referente ao período de ')
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(periodo)
+    objeto1.bold = True
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(', para atender as necessidades da Secretaria Municipal de Saúde, em conformidade com as especificações constantes no Procedimento Administrativo nº ')
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run(processo)
+    objeto1.bold = True
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1 = objeto.add_run('.')
+    objeto1.font.size = Pt(11)
+    objeto1.font.name = 'Arial'
+    objeto1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+
+  # Data de Assinatura
+
+    obj = doc.add_heading(level=1)
+
+    obj1 = obj.add_run("DATA DE\nASSINATURA:")
+    obj1.font.color.rgb = RGBColor(0, 0, 0)
+    obj1.font.size = Pt(11)
+    obj1.font.name = 'Arial'
+    obj.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = obj.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
 
 
   # Cidade e Data
 
-  cd = doc.add_paragraph()
-  cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  cd1 = cd.add_run('\nDuque de Caxias, ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(dia)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(nome_mes)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(ano)
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run('.')
-  cd1.bold = True
-  cd1.font.size = Pt(11)
-  cd1.font.name = 'Arial'
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('Duque de Caxias, ')
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.bold = True
+    cd1.font.size = Pt(11)
+    cd1.font.name = 'Arial'
 
 
   # Secretaria
-  assinatura = doc.add_paragraph()
-  assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-  paragraph_format = assinatura.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
 
-  assinatura1 = assinatura.add_run("\n\n\nCélia Serrano da Silva ")
-  assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-  assinatura1.font.all_caps = True
-  assinatura1.bold = True
-  assinatura1.font.size = Pt(11)
-  assinatura1.font.name = 'Arial'
+    assinatura1 = assinatura.add_run("\n\n\nCélia Serrano da Silva ")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.font.all_caps = True
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(11)
+    assinatura1.font.name = 'Arial'
 
-  assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(11)
-  assinaturasec.font.name = 'Arial'
+    assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(11)
+    assinaturasec.font.name = 'Arial'
 
-  assinaturasec = assinatura.add_run("\nMat. 23098-0")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(11)
-  assinaturasec.font.name = 'Arial'
-
+    assinaturasec = assinatura.add_run("\nMat. 23098-0")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(11)
+    assinaturasec.font.name = 'Arial'
 
 
   # Nome do arquivo
 
-  nome_arquivo = processo.replace('/','.')
-  nome_do_arquivo = str(TAC + ' - ' + nome_arquivo)
+    nome_arquivo = processo.replace('/','.')
+    nome_do_arquivo = str(n_termo + ' - ' + nome_arquivo)
 
 
-  end_time = time.time()
+    end_time = time.time()
+
+    if '/' in empresa:
+      empresa = empresa.replace('/', '')
+    else:
+      pass
+
+  # Salva o documento
+    caminho = f'/content/drive/MyDrive/TAC E REC - {ano}'
+    if os.path.exists(caminho):
+      pass
+    else:
+      os.makedirs(caminho)
+    caminho_2 = f'{caminho}/{t} - {ano}'
+    if os.path.exists(caminho_2):
+      pass
+    else:
+      os.makedirs(caminho_2)
+
+    doc.save(f'{caminho_2}/{t} {nome_do_arquivo} - {empresa}.docx')
 
 
 
+    print(f"{t} {nome_do_arquivo} gerado com sucesso!")
 
-  # Salvamento
-  doc.save(f'/content/drive/MyDrive/TAC E REC - 2024/REC - 2024/REC {nome_do_arquivo}.docx')
-  print(f"REC {TAC} gerado para processo nº {processo} com sucesso!")
+# Despacho
+doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
+
+nome_mes = meses[mes_atual - 1]
+
+ano = str(datetime.now().year)
+
+for index, row in tabela.iterrows():
+  processo = str(row["Processo"])
+  if processo == "":
+    break
+  else:
+    nome_instrutor = row['Instruído por:']
+
+    if nome_instrutor == 'Lorrayne':
+      instrutor = 'Lorrayne Albuquerque'
+      cargo = 'Assistente Operacional'
+      mat = 'Mat. 44.537-1'
+    elif nome_instrutor == 'Carol':
+      instrutor = 'Carolina Bandeira'
+      cargo = 'Coordenadora de Instrução Processual'
+      mat = 'Mat. 43.385-3'
+    elif nome_instrutor == 'Marlon':
+      instrutor = 'Marlon Lopes'
+      cargo = 'Assistente Operacional'
+      mat = 'Mat. 47.643-9'
+    elif nome_instrutor == 'Letícia':
+      instrutor = 'Letícia Pimenta'
+      cargo = 'Assistente Operacional'
+      mat = 'Mat. 46.988-2'
+    folha = row["Folha"]
+    folha = folha + 6
+    num_processo = doc.add_paragraph('\n\n')
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run(f'FL.:')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run(f'     {folha}      ')
+    paragrafo1.underline = True
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('Rubrica:________')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo = doc.add_paragraph()
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run = paragrafo.add_run('\nÀ')
+    run.bold = True
+    run.font.size = Pt(10)
+    run.font.name = 'Arial'
+    run = paragrafo.add_run('\nCoordenadoria de Contas a Pagar')
+    run.bold = True
+    run.font.size = Pt(10)
+    run.font.name = 'Arial'
+
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    paragrafo = doc.add_paragraph()
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo1 = paragrafo.add_run('        Encaminhamos o presente processo de pagamento, a fim de que seja emitida a nota de liquidação, obedecendo aos preceitos e formalidades legais.')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+
+    # Cidade e Data
+
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+
+    atenc = doc.add_paragraph()
+    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    formatação = atenc.paragraph_format
+    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    assinatura1 = assinatura.add_run(f"\n\n{instrutor}")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(fonte_padrão)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run(f"\n{cargo}")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run(f"\n{mat}")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    doc.add_page_break()
+
+  # Nome do arquivo
+
+    nome_arquivo = processo.replace('/','.')
+
+    end_time = time.time()
+
+
+
+    # Salvamento
+    salvamento = f'/content/drive/MyDrive/TAC E REC - {ano}'
+    if os.path.exists(salvamento):
+      pass
+    else:
+      os.makedirs(salvamento)
+
+
+    doc.save(f'{salvamento}/Despacho.docx')
+print(f"Despachos gerados com sucesso!")
+
 
 execution_time = end_time - start_time
-print(f"Tempo de execução: {execution_time} segundos")
+print(f"Tempo de execução: {execution_time:.1f} segundos")
 
 """# TERMO E AUTORIZO"""
 
@@ -1659,559 +1134,902 @@ from datetime import datetime
 import time
 import pandas as pd
 from num2words import num2words
+pd.set_option('display.max_colwidth', None)
+import random
+from docx import Document
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+import os
 
 start_time = time.time()
 
 # LISTA DE PROCESSOS PARA INSTRUÇÃO
-
-sheet_title = 'Dados TAC'
-instruir = gc.open('Dados TAC').get_worksheet(2).get_all_records()
-
-sheet_title = 'Dados TAC'
-notas = gc.open('Dados TAC').get_worksheet(3).get_all_records()
+instruir = gc.open('Dados TAC').worksheet('Instruir').get_all_records()
+base = gc.open('Base de Dados - FMS').worksheet('Objetos').get_all_records()
 
 
 # DATA FRAMES
 instruir = pd.DataFrame(instruir)
-notas = pd.DataFrame(notas)
+base = pd.DataFrame(base)
 
+#base de dados para tirar a unidade
+unidades = [
+ "Hospital Municipalizado Adão Pereira Nunes",
+ "Hospital Municipal Dr. Moacyr Rodrigues do Carmo",
+ "a UPA Lafaiete",
+ "a UPA Sarapuí",
+ "Hospital Municipal do Olho Julio Candido Brito",
+ "Departamento de Farmácia"
+]
 
+#base de empresas que não precisam tirar a unidade
+base_empresas = [
+ "TORRESMED COMÉRCIO DE EQUIPAMENTOS HOSPITALARES LTDA",
+ "KM MATERIAIS MEDICOS LTDA",
+ "MARJA COMÉRCIO E REPRESENTAÇÕES E IMPORTAÇÕES DE PRODUTOS PARA SAÚDE LTDA"
+]
 
-
-
+#unidade a ser colocada
+sms = "atendimento às necessidades da Secretaria Municipal de Saúde"
 
 for index, row in instruir.iterrows():
   doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
-
-  section = doc.sections[0]
-  section.left_margin = Inches(0.8)
-  section.right_margin = Inches(0.8)
-
-
-# Data
-
-  dia = str(datetime.now().strftime("%d"))
-  mes_atual = datetime.now().month
-  meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-  nome_mes = meses[mes_atual - 1]
-  ano = str(datetime.now().year)
-
-
-
-# Valor Monetário por extenso
-
-  valor_texto = row["VALOR"]
-  valor_numerico = valor_texto.replace(",", ".").replace(".","")
-  valor_numerico = valor_numerico.replace("$","")
-  valor_numerico = int(valor_numerico)
-  valor_numerico = valor_numerico / 100
-
-
-  def valor_monetario_por_extenso(valor_numerico):
-
-      # Separar a parte inteira e decimal do valor
-      reais, centavos = divmod(valor_numerico, 1)
-      centavos = round(centavos * 100)
-
-      # Converter a parte inteira para extenso
-      reais = num2words(reais, lang='pt_BR')
-
-      # Converter a parte decimal para extenso
-      centavos = num2words(centavos, lang='pt_BR')
-
-      if centavos == 'zero':
-        extenso_final = f'{reais} reais'
-      else: # Assign a value to extenso_final when centavos is not zero
-        extenso_final = f'{reais} reais e {centavos} centavos'
-
-      return extenso_final
-
-
-# Informaões do Termo
-
-  processo = str(row["PROCESSO"])
-  processo_fl = processo + ' Fl'
-
-
-  valor = valor_texto
-  valor2 = valor.replace("$", "R$ ")
-
-
-  valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
-  valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
-
-
-# Notas Fiscais
-
-  processo = row['PROCESSO']
-  notas_processo = notas[notas['PROCESSO'] == processo]
-
-  agrupados = notas.groupby('PROCESSO')['NOTAS'].apply(lambda x: ', '.join(map(str, x))).reset_index()
-  lista_notas = agrupados.loc[agrupados['PROCESSO'] == processo, 'NOTAS'].to_string(index = False)
-
-
-  tipo = instruir['DOC'].iloc[0]
-  notas_filtradas = notas[notas['PROCESSO'] == processo]
-  qtd_notas = len(notas_filtradas)
-
-
-  if tipo == 'DNF' and qtd_notas > 1:
-    num_notas = 'às DANFES'
-
-  elif tipo == 'DNF' and qtd_notas == 1:
-    num_notas = 'a DANFE'
-
-
-  elif tipo == 'NF' and qtd_notas > 1:
-    num_notas = 'às Notas Fiscais'
-
-  elif  tipo == 'NF' and qtd_notas == 1:
-    num_notas = 'a Nota Fiscal'
-
+  if row['PROCESSO'] == "":
+    break
   else:
-    num_notas = 'a fatura de locação'
+    numerar_processo = row['FOLHA'] + 4
+
+    section = doc.sections[0]
+    section.left_margin = Inches(1.24)
+    section.right_margin = Inches(1.4)
+
+    fonte_proc = 10
+    fonte_padrão = 11
+    fonte_título = 12
 
 
-# Data de emissão
-
-  emissao = notas[notas['PROCESSO'] == processo]
-  maior_data = emissao['EMISSÃO'].max()
-  menor_data = emissao['EMISSÃO'].min()
-
-  if maior_data == menor_data:
-
-    data_emissao = maior_data
-
-  else:
-    data_emissao = str(menor_data) + ' a ' + str(maior_data)
 
 
-# Informações
+  # Data
 
-  cnpj = row["CNPJ"]
-  periodo = row["PERÍODO"]
-  empresa = row["EMPRESA"]
-  objeto = row["OBJETO"]
-  notas_fiscais = str(lista_notas)
-
-  ano_atual = str(datetime.now().year)
-
-  ano_referencia = periodo.split('/')
-  ano_referencia = str(ano_referencia[-1])
-
-  if ano_referencia == ano_atual:
-    termo = 'TERMO DE AJUSTE DE CONTAS'
-
-  else:
-    termo = 'TERMO DE RECONHECIMENTO DE DÍVIDA'
+    dia = str(datetime.now().strftime("%d"))
+    mes_atual = datetime.now().month
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    nome_mes = meses[mes_atual - 1]
+    ano = str(datetime.now().year)
 
 
-# AUTORIZO
+  # Valor Monetário por extenso
+
+    valor_texto = row["VALOR"]
+    valor_numerico = valor_texto.replace(",", ".").replace(".","")
+    valor_numerico = valor_numerico.replace("$","")
+    valor_numerico = int(valor_numerico)
+    valor_numerico = valor_numerico / 100
 
 
-  num_processo = doc.add_paragraph('\n')
-  num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  paragraph_format = num_processo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    def valor_monetario_por_extenso(valor_numerico):
 
-  paragrafo = num_processo.add_run(f'Processo n° {processo_fl}')
-  paragrafo.bold = True
-  paragrafo.font.size = Pt(11)
-  paragrafo.font.name = 'Arial'
+        # Separar a parte inteira e decimal do valor
+        reais, centavos = divmod(valor_numerico, 1)
+        centavos = round(centavos * 100)
 
-  paragrafo = doc.add_paragraph()
-  paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = paragrafo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+        # Converter a parte inteira para extenso
+        reais = num2words(reais, lang='pt_BR')
 
-  paragrafo1 = paragrafo.add_run('              Nos termos do Decreto 8.641, de 02 de janeiro de 2024, ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+        # Converter a parte decimal para extenso
+        centavos = num2words(centavos, lang='pt_BR')
 
-  paragrafo1 = paragrafo.add_run('AUTORIZO')
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+        if centavos == 'zero':
+          extenso_final = f'{reais} reais'
+        else: # Assign a value to extenso_final when centavos is not zero
+          extenso_final = f'{reais} reais e {centavos} centavos'
 
-  paragrafo1 = paragrafo.add_run(' o Pagamento do Administrativo acima mencionado no valor de ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+        return extenso_final
 
-  paragrafo1 = paragrafo.add_run(valor2)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+  # Informaões do Termo
+    nome_instrutor = row['INSTRUIDO POR:']
+    processo = str(row["PROCESSO"])
+    processo_fl = processo + f' Fl {numerar_processo}'
+    folha = row["FOLHA"]
+    num_pag_termo = folha + 4
+    num_pag_autorizo = folha + 5
+    num_pag_despacho = folha + 6
 
-  paragrafo1 = paragrafo.add_run(f', referente {num_notas} n° ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+  # Informaões do autorizo
 
-  paragrafo1 = paragrafo.add_run(notas_fiscais)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+    numerar_processo2 = numerar_processo + 1
 
-  paragrafo1 = paragrafo.add_run(' de ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+    processo = str(row["PROCESSO"])
+    processo_fll = processo + f' Fl {numerar_processo2}'
 
-  paragrafo1 = paragrafo.add_run(data_emissao)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run(', associado aos serviços de ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+  # Informaões do despacho
 
-  paragrafo1 = paragrafo.add_run(objeto)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+    numerar_processo3 = numerar_processo2 + 1
 
-  if tipo == 'DNF':
-    periodo = ""
+    processo = str(row["PROCESSO"])
+    processo_flll = processo + f' Fl {numerar_processo3}'
 
-  else:
-    paragrafo1 = paragrafo.add_run(' prestados no período de ')
-    paragrafo1.font.size = Pt(12)
-    paragrafo1.font.name = 'Arial'
-    paragrafo1 = paragrafo.add_run(periodo)
+
+    valor = valor_texto
+    valor2 = valor.replace("$", "R$ ")
+
+
+    valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
+    valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
+    if "14" in valor2:
+      valor_monetario_por_extenso = valor_monetario_por_extenso.replace("catorze", "quatorze")
+
+
+  # Notas Fiscais
+    if processo[-4:] == "2025":
+      expected_headers = ['PROCESSO', 'NOTAS', 'EMISSÃO','REFERÊNCIA']
+      notas = gc.open('Dados TAC').worksheet('Notas 2025').get_all_records(expected_headers=expected_headers)
+      notas = pd.DataFrame(notas)
+    else:
+      expected_headers = ['PROCESSO', 'NOTAS', 'EMISSÃO','REFERÊNCIA']
+      notas = gc.open('Dados TAC').worksheet('Notas 2024').get_all_records(expected_headers=expected_headers)
+      notas = pd.DataFrame(notas)
+
+
+    processo = row['PROCESSO']
+    notas_processo = notas[notas['PROCESSO'] == processo]
+
+    agrupados = notas.groupby('PROCESSO')['NOTAS'].apply(lambda x: ', '.join(map(str, x))).reset_index()
+    lista_notas = agrupados.loc[agrupados['PROCESSO'] == processo, 'NOTAS'].to_string(index = False)
+
+
+    tipo = row['DOC']
+    notas_filtradas = notas[notas['PROCESSO'] == processo]
+    qtd_notas = len(notas_filtradas)
+
+
+    if tipo == 'DNF' and qtd_notas > 1:
+      num_notas = 'das DANFES'
+
+      num_notas = 'das DANFES'
+
+    elif tipo == 'DNF' and qtd_notas == 1:
+      num_notas = 'da DANFE'
+
+
+    elif tipo == 'NF' and qtd_notas > 1:
+      num_notas = 'das Notas Fiscais'
+
+    elif  tipo == 'NF' and qtd_notas == 1:
+      num_notas = 'da Nota Fiscal'
+
+    elif tipo == 'FL' and qtd_notas > 1:
+      num_notas = 'das faturas de locação'
+
+    elif tipo == 'FL' and qtd_notas == 1:
+      num_notas = 'da fatura de locação'
+
+    else:
+      num_notas = 'TIPO DE DOCUMENTO NÃO ESPECIFICADO NA PLANILHA'
+
+
+    if tipo == 'DNF':
+      tipo_nota = 'DANFE'
+
+    elif tipo == 'FL':
+      tipo_nota = 'Fatura de Locação'
+
+
+    elif tipo == 'NF':
+      tipo_nota = 'Nota Fiscal'
+
+
+  # Emitida
+    if qtd_notas > 1:
+      emitida = ' emitidas'
+
+    else:
+      emitida = ' emitida'
+
+
+  # Data de emissão
+
+    notas['EMISSÃO'] = pd.to_datetime(notas['EMISSÃO'], dayfirst=True, errors='coerce')
+
+    emissao = notas[notas['PROCESSO'] == processo]
+
+    maior_data = emissao['EMISSÃO'].max()
+    menor_data = emissao['EMISSÃO'].min()
+
+    if maior_data == menor_data:
+      data_emissao = maior_data.strftime("%d/%m/%Y")
+    else:
+      data_emissao = f"{menor_data.strftime('%d/%m/%Y')} à {maior_data.strftime('%d/%m/%Y')}"
+
+  # Informações
+
+    cnpj = row["CNPJ"]
+    periodo_inicial = row["PERÍODO INICIAL"]
+    periodo_final = row["PERÍODO FINAL"]
+    if periodo_inicial == periodo_final:
+      periodo = periodo_inicial
+    else:
+      periodo = periodo_inicial + ' à ' + periodo_final
+    qtd_barras = data_emissao.count("/")
+    empresa = row["EMPRESA"]
+    objeto = row["OBJETO"]
+    notas_fiscais = str(lista_notas)
+
+    #laço para percorrer os itens da base de empresas
+    for i in base_empresas:
+        #para verificar se o item que está na base de empresas é igual a variável empresa
+        if str(i) == str(empresa):
+            #se o if for verdadeiro, para o laço for usando o break, fazendo com que ele pule todo bloco identado ao laço
+            break
+        else:
+          #para filtrar apenas o objeto referido ao processo
+          objeto_categoria = base[base['OBJETO'] == objeto]
+          #para pegar a categoria do objeto
+          categoria = objeto_categoria['CATEGORIA'].values
+          #para verificar a categoria do objeto
+          if 'MEDICAMENTOS' in categoria or 'MATERIAIS HOSPITALARES' in categoria:
+            #se a categoria for "MEDICAMENTOS" ou "MATERIAIS HOSPITALARES", roda outro laço for para percorrer a lista de unidades
+            for i in unidades:
+              #para verificar se o item da lista de unidades é igual a unidade do objeto
+              if str(i) in str(objeto):
+                #se o if for verdadeiro, usa o .replace para trocar o item da lista de unidades para a unidade a ser colocada
+                objeto = objeto.replace(str(i), str(sms))
+              else:
+                pass
+          else:
+            pass
+
+    ano_atual = str(datetime.now().year)
+
+    ano_referencia = periodo.split('/')
+    ano_referencia = str(ano_referencia[-1])
+
+    if ano_referencia == ano_atual:
+      termo = 'TERMO DE AJUSTE DE CONTAS'
+
+    else:
+      termo = 'TERMO DE RECONHECIMENTO DE DÍVIDA'
+
+
+  # Preposição depois de 'emitida' (em/de)
+    if qtd_barras == 2:
+      preposicao_emitida = ' em '
+
+    else:
+      preposicao_emitida = ' de '
+
+
+  # TERMO
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
     paragrafo1.bold = True
-    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.size = Pt(fonte_proc)
     paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run(', apresentada pela empresa ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+    paragrafo1 = num_processo.add_run('FL.: ')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run(empresa)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+    paragrafo1 = num_processo.add_run(f'    {num_pag_termo}    ')
+    paragrafo1.underline = True
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run('.')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run('\n	   O exame da documentação associada ao presente pleito, nos termos do decreto supracitado, no âmbito das responsabilidades desta Secretaria Municipal de Saúde, foi considerado ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run('SEM RESSALVAS.')
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+    paragrafo1 = num_processo.add_run('  Rubrica:________')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
 
 
-  paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = paragrafo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    paragrafo = doc.add_paragraph('\n')
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
 
-# Atesto notas fiscais
+    paragrafo1 = paragrafo.add_run(termo)
+    paragrafo1.font.color.rgb = RGBColor(0, 0, 0)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
 
-  if len(notas_processo) > 1:
 
-     paragrafo = doc.add_paragraph()
-     paragrafo.paragraph_format.left_indent = Inches(1.5)
+    paragrafo = doc.add_paragraph('\n')
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-     paragrafo1 = paragrafo.add_run(f'1. Notas Fiscais atestadas por:\n')
-     paragrafo1.font.size = Pt(11)
-     paragrafo1.font.name = 'Arial'
 
-     for index, row in notas_processo.iterrows():
+    paragrafo1 = paragrafo.add_run('             Fica reconhecida a dívida referente à ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(objeto)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    if tipo == 'DNF':
+      if data_emissao != periodo:
+        paragrafo1 = paragrafo.add_run(' no período de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+        paragrafo1 = paragrafo.add_run(periodo)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+      else:
+        pass
+
+    else:
+      paragrafo1 = paragrafo.add_run(' no período de ')
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+      paragrafo1 = paragrafo.add_run(periodo)
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+
+
+    paragrafo1 = paragrafo.add_run(f', decorrente {num_notas} n° ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    notas_fiscais = str(notas_fiscais)
+    paragrafo1 = paragrafo.add_run(notas_fiscais)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(emitida)
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(preposicao_emitida)
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(data_emissao)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo1 = paragrafo.add_run(', perfazendo o valor total de ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(valor2)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(', encartada ao processo em epígrafe em favor da pessoa jurídica ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(empresa)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(', inscrita no CNPJ sob o n.º ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(cnpj)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('.')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+  # Cidade e Data
+
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\nDuque de Caxias, ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+
+
+  # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run("\n\n\nCÉLIA SERRANO DA SILVA ")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(12)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(12)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nMat. 23098-0")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(12)
+    assinaturasec.font.name = 'Arial'
+
+
+
+  # QUEBRA
+    doc.add_page_break()
+
+
+  # AUTORIZO
+
+
+    num_processo = doc.add_paragraph('\n')
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('FL.: ')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run(f'    {num_pag_autorizo}    ')
+    paragrafo1.underline = True
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('  Rubrica:________')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo = doc.add_paragraph('\n\n')
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    paragrafo1 = paragrafo.add_run('              Nos termos do Decreto 8.641, de 02 de janeiro de 2024, ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('AUTORIZO')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(' o Pagamento do presente processo administrativo no valor de ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(valor2)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(f', decorrente {num_notas} n° ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(notas_fiscais)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(emitida)
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(preposicao_emitida)
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(data_emissao)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(', pela pessoa jurídica ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(empresa)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo1 = paragrafo.add_run(', referente aos serviços de ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(f'{objeto}')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    if tipo == 'DNF':
+      if data_emissao != periodo:
+        paragrafo1 = paragrafo.add_run(' no período de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+        paragrafo1 = paragrafo.add_run(f'{periodo}.')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+      else:
+        paragrafo1 = paragrafo.add_run(f'.')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+    else:
+      paragrafo1 = paragrafo.add_run(' no período de ')
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+      paragrafo1 = paragrafo.add_run(f'{periodo}.')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('\n\n	   O exame da documentação associada ao presente pleito, nos termos do decreto supracitado, no âmbito das responsabilidades desta Secretaria Municipal de Saúde, foi considerado ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('SEM RESSALVAS.')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+  # Atesto notas fiscais
+
+    if tipo == 'DNF' and qtd_notas > 1:
+      docf = 'DANFES'
+
+    elif tipo == 'DNF' and qtd_notas == 1:
+      docf = 'DANFE'
+
+    elif tipo == 'NF' and qtd_notas > 1:
+      docf = 'Notas Fiscais'
+
+    elif tipo == 'NF' and qtd_notas == 1:
+      docf = 'Nota Fiscal'
+
+    elif tipo == 'FL' and qtd_notas > 1:
+      docf = 'Faturas de Locação'
+
+    elif tipo == 'FL' and qtd_notas == 1:
+      docf = 'Fatura de Locação'
+
+    else:
+      num_notas = 'TIPO DE DOCUMENTO NÃO ESPECIFICADO NA PLANILHA'
+
+
+
+    for index, row in notas_processo.iterrows():
       processo = row['PROCESSO']
       nota = row['NOTAS']
       fiscais = row['FISCAL NOTA']
       emissao = row['EMISSÃO']
+    paragrafox = doc.add_paragraph()
+    paragrafox.paragraph_format.left_indent = Inches(1.5)
+    paragrafox.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-      paragrafo1 = paragrafo.add_run(f'\n{nota}  {fiscais}')
-      paragrafo1.bold = True
-      paragrafo1.font.size = Pt(8)
+    paragrafo1 = paragrafox.add_run(f'1. {docf} n° {notas_fiscais}')
+    paragrafo1.font.size = Pt(11)
+    paragrafo1.font.name = 'Arial'
+
+    if qtd_notas > 1:
+      paragrafo1 = paragrafox.add_run(f' atestadas por: ')
+      paragrafo1.font.size = Pt(11)
+      paragrafo1.font.name = 'Arial'
+    else:
+      paragrafo1 = paragrafox.add_run(f' atestada por: ')
+      paragrafo1.font.size = Pt(11)
       paragrafo1.font.name = 'Arial'
 
-
-  else:
-      for index, row in notas_processo.iterrows():
-        processo = row['PROCESSO']
-        nota = row['NOTAS']
-        fiscais = row['FISCAL NOTA']
-        emissao = row['EMISSÃO']
-
-        num_notas2 = 'Nota Fiscal atestada'
-        paragrafo = doc.add_paragraph()
-        paragrafo.paragraph_format.left_indent = Inches(1.5)
-
-        atesto_notas = paragrafo.add_run(f'1. Nota Fiscal ')
-        atesto_notas.font.size = Pt(12)
-        atesto_notas.font.name = 'Arial'
-
-        atesto_notas = paragrafo.add_run(str(nota))
-        atesto_notas.bold = True
-        atesto_notas.font.size = Pt(12)
-        atesto_notas.font.name = 'Arial'
-
-        atesto_notas = paragrafo.add_run(f' atestada por {fiscais}')
-        atesto_notas.font.size = Pt(12)
-        atesto_notas.font.name = 'Arial'
-
-
-# Cidade e Data
-
-  cd = doc.add_paragraph()
-  cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  cd1 = cd.add_run('\nDuque de Caxias, ')
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(dia)
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(nome_mes)
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(ano)
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run('.')
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-
-
-# Secretaria
-  assinatura = doc.add_paragraph()
-  assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-  paragraph_format = assinatura.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-
-  assinatura1 = assinatura.add_run("\n\n\nCélia Serrano da Silva ")
-  assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-  assinatura1.bold = True
-  assinatura1.font.size = Pt(12)
-  assinatura1.font.name = 'Arial'
-
-  assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(12)
-  assinaturasec.font.name = 'Arial'
-
-  assinaturasec = assinatura.add_run("\nMat. 23098-0")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(12)
-  assinaturasec.font.name = 'Arial'
-
-
-# QUEBRA
-  doc.add_page_break()
-
-
-# TERMO
-
-  num_processo = doc.add_paragraph('\n\n')
-  num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  paragraph_format = num_processo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  paragrafo1 = num_processo.add_run(f'Processo n° {processo_fl}')
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-
-  paragrafo = doc.add_paragraph()
-  paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-  paragraph_format = paragrafo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-
-  paragrafo1 = paragrafo.add_run(termo)
-  paragrafo1.font.color.rgb = RGBColor(0, 0, 0)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-
-  paragrafo = doc.add_paragraph()
-  paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = paragrafo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-
-  paragrafo1 = paragrafo.add_run('             Fica reconhecida a dívida no valor de ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run(valor2)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run(', associado à ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run(objeto)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  if tipo == 'DNF':
-    periodo = ""
-
-  else:
-    paragrafo1 = paragrafo.add_run(' prestados no período de ')
-    paragrafo1.font.size = Pt(12)
-    paragrafo1.font.name = 'Arial'
-    paragrafo1 = paragrafo.add_run(periodo)
+    paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+    paragrafo1.font.size = Pt(11)
     paragrafo1.bold = True
-    paragrafo1.font.size = Pt(12)
     paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run(f', referente {num_notas} n° ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run(notas_fiscais)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+  # Cidade e Data
 
-  paragrafo1 = paragrafo.add_run(' de ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run(data_emissao)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run(', encartada ao processo em epígrafe em favor de ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run(empresa)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run('., inscrita no CNPJ sob o n.º ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run(cnpj)
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
-
-  paragrafo1 = paragrafo.add_run('.')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\nDuque de Caxias, ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
 
 
-# Cidade e Data
-
-  cd = doc.add_paragraph()
-  cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  cd1 = cd.add_run('\nDuque de Caxias, ')
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(dia)
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(nome_mes)
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(' de ')
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run(ano)
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
-  cd1 = cd.add_run('.')
-  cd1.bold = True
-  cd1.font.size = Pt(12)
-  cd1.font.name = 'Arial'
+  # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
 
-# Secretaria
-  assinatura = doc.add_paragraph()
-  assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-  paragraph_format = assinatura.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    assinatura1 = assinatura.add_run("\n\n\nCÉLIA SERRANO DA SILVA")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(fonte_padrão)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nMat. 23098-0")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
 
 
-  assinatura1 = assinatura.add_run("\n\n\nCélia Serrano da Silva ")
-  assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-  assinatura1.bold = True
-  assinatura1.font.size = Pt(12)
-  assinatura1.font.name = 'Arial'
-
-  assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(12)
-  assinaturasec.font.name = 'Arial'
-
-  assinaturasec = assinatura.add_run("\nMat. 23098-0")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(12)
-  assinaturasec.font.name = 'Arial'
+    # QUEBRA
+    doc.add_page_break()
 
 
-# Nome do arquivo
+  # Despacho
 
-  nome_arquivo = processo.replace('/','.')
+    if nome_instrutor == 'Lorrayne':
+      instrutor = 'Lorrayne Albuquerque'
+      cargo = 'Assistente Operacional'
+      mat = 'Mat. 44.537-1'
+    elif nome_instrutor == 'Carol':
+      instrutor = 'Carolina Bandeira'
+      cargo = 'Coordenadora de Instrução Processual'
+      mat = 'Mat. 43.385-3'
+    elif nome_instrutor == 'Marlon':
+      instrutor = 'Marlon Lopes'
+      cargo = 'Assistente Operacional'
+      mat = 'Mat. 47.643-9'
+    elif nome_instrutor == 'Letícia':
+      instrutor = 'Letícia Pimenta'
+      cargo = 'Assistente Operacional'
+      mat = 'Mat. 46.988-2'
 
-  end_time = time.time()
+    num_processo = doc.add_paragraph('\n\n')
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('FL.: ')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run(f'    {num_pag_despacho}    ')
+    paragrafo1.bold = True
+    paragrafo1.underline = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('  Rubrica:________')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo = num_processo.add_run('\nDESPACHO')
+    paragrafo.font.underline = True
+    paragrafo.bold = True
+    paragrafo.font.size = Pt(fonte_padrão)
+    paragrafo.font.name = 'Arial'
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo = num_processo.add_run(f'\nÀ Procuradoria Geral do Município.\n')
+    paragrafo.font.size = Pt(fonte_padrão)
+    paragrafo.font.name = 'Arial'
+
+    paragrafo = doc.add_paragraph()
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo1 = paragrafo.add_run('        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento através de Ajuste de Contas/Reconhecimento de Dívida, com base nos documentos encartados aos autos.')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
 
 
 
+  # Cidade e Data
+
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+
+    atenc = doc.add_paragraph()
+    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    formatação = atenc.paragraph_format
+    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run(f"\n\n{instrutor}")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(fonte_padrão)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run(f"\n{cargo}")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run(f"\n{mat}")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+
+    atenc = doc.add_paragraph()
+    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    formatação = atenc.paragraph_format
+    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
 
 
+    # Revisão
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run("\n\nMayra de Souza Pimentel")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(fonte_padrão)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nDiretora de Instrução Processual")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nMat. 41.551-0")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+
+  # Nome do arquivo
+
+    nome_arquivo = processo.replace('/','.')
+
+    end_time = time.time()
 
 
 
-# Salvamento
-  doc.save(f'/content/drive/MyDrive/TERMOS E AUTORIZOS/{nome_arquivo}.docx')
-  print(f"Autorizo para processo nº {processo} gerado com sucesso!")
+    # Salvamento
+    caminho = f'/content/drive/MyDrive/TERMOS E AUTORIZOS/{ano}/{empresa}'
+
+    if os.path.exists(caminho):
+      pass
+    else:
+      os.makedirs(caminho)
+
+    doc.save(f'{caminho}/{nome_arquivo}.docx')
+    print(f"Autorizo para processo nº {processo} gerado com sucesso!")
 
 
 execution_time = end_time - start_time
-print(f"Tempo de execução: {execution_time} segundos")
+print(f"Tempo de execução: {execution_time:.1f} segundos")
 
 """# PROHEALTH"""
 
@@ -2242,271 +2060,286 @@ Prohealth = gc.open('Dados TAC').get_worksheet(4)
 tabela = pd.DataFrame(Prohealth.get_all_records())
 
 
-for index, row in tabela.iterrows():
+processos = tabela['PROCESSO'].unique()
 
+for processo in processos:
   doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
 
   section = doc.sections[0]
   section.left_margin = Inches(0.8)
   section.right_margin = Inches(0.8)
 
-  # Data
+  df_processo = tabela[tabela['PROCESSO'] == processo]
 
-  dia = str(datetime.now().strftime("%d"))
-  mes_atual = datetime.now().month
-  meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-  nome_mes = meses[mes_atual - 1]
-  ano = str(datetime.now().year)
 
+  for index, row in df_processo.iterrows():
 
-  # Valor Monetário por extenso
 
-  valor_texto = row['VALOR']
-  valor_numerico = valor_texto.replace(",", ".").replace(".","")
-  valor_numerico = valor_numerico.replace("$","")
-  valor_numerico = int(valor_numerico)
-  valor_numerico = valor_numerico / 100
 
-  def valor_monetario_por_extenso(valor_numerico):
-      # Separar a parte inteira e decimal do valor
-      reais, centavos = divmod(valor_numerico, 1)
-      centavos = round(centavos * 100)
+    # Data
 
-      # Converter a parte inteira para extenso
-      reais = num2words(reais, lang='pt_BR')
+    dia = str(datetime.now().strftime("%d"))
+    mes_atual = datetime.now().month
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+              "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    nome_mes = meses[mes_atual - 1]
+    ano = str(datetime.now().year)
 
-      # Converter a parte decimal para extenso
-      centavos = num2words(centavos, lang='pt_BR')
 
-      if centavos == 'zero':
-        extenso_final = f'{reais} reais'
-      else: # Assign a value to extenso_final when centavos is not zero
-        extenso_final = f'{reais} reais e {centavos} centavos'
+    # Valor Monetário por extenso
 
-      return extenso_final
+    valor_texto = row['VALOR']
+    valor_numerico = valor_texto.replace(",", ".").replace(".","")
+    valor_numerico = valor_numerico.replace("$","")
+    valor_numerico = int(valor_numerico)
+    valor_numerico = valor_numerico / 100
 
-  # Informações
+    def valor_monetario_por_extenso(valor_numerico):
+        # Separar a parte inteira e decimal do valor
+        reais, centavos = divmod(valor_numerico, 1)
+        centavos = round(centavos * 100)
 
-  processo = str(row['PROCESSO'])
-  processo_fl = processo + ' Fl'
+        # Converter a parte inteira para extenso
+        reais = num2words(reais, lang='pt_BR')
 
-  valor = valor_texto
-  valor = 'R' + valor + ' '
+        # Converter a parte decimal para extenso
+        centavos = num2words(centavos, lang='pt_BR')
 
-  valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
-  valor_monetario_por_extenso = '('+ valor_monetario_por_extenso + ')'
+        if centavos == 'zero':
+          extenso_final = f'{reais} reais'
+        else: # Assign a value to extenso_final when centavos is not zero
+          extenso_final = f'{reais} reais e {centavos} centavos'
 
-  nota_fiscal1 = row['NOTA']
-  nota_fiscal = str(nota_fiscal1) + ' de '
-  emissão = row['EMISSÃO']
+        return extenso_final
 
-  periodo = row['MÊS']
-  periodo = str(periodo) + '/2024'
-  empresa = row['EMPRESA']
-  objeto = row['OBJETO']
-  nome = row['NOME']
-  fiscais = row['FISCAIS']
-
+    # Informações
 
+    processo = str(row['PROCESSO'])
+    processo_fl = processo + ' Fl'
 
-  num_processo = doc.add_paragraph('\n')
-  num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  paragraph_format = num_processo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    valor = valor_texto
+    valor = 'R' + valor + ' '
 
+    valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
+    valor_monetario_por_extenso = '('+ valor_monetario_por_extenso + ')'
 
-  processo = num_processo.add_run(f'Processo n° {processo_fl}')
-  processo.bold = True
-  processo.font.size = Pt(12)
-  processo.font.name = 'Arial'
+    nota_fiscal1 = row['NOTA']
+    nota_fiscal = str(nota_fiscal1) + ' de '
+    emissão = row['EMISSÃO']
 
-  paragrafo = doc.add_paragraph()
-  paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = paragrafo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    periodo = row['MÊS']
+    periodo = str(periodo) + '/2024'
+    empresa = row['EMPRESA']
+    objeto = row['OBJETO']
+    nome = row['NOME']
+    fiscais = row['FISCAIS']
+    relatorio = row['RELATÓRIO']
 
-  paragrafo1 = paragrafo.add_run('        Nos termos do Decreto 8.641 de 02 de janeiro de 2024, ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run('AUTORIZO')
-  paragrafo1.bold = True
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
 
-  paragrafo1 = paragrafo.add_run(' o pagamento do Administrativo acima mencionado no valor de ')
-  paragrafo1.font.size = Pt(12)
-  paragrafo1.font.name = 'Arial'
 
-  paragrafo2 = paragrafo.add_run(valor)
-  paragrafo2.bold = True
-  paragrafo2.font.size = Pt(12)
-  paragrafo2.font.name = 'Arial'
+    num_processo = doc.add_paragraph('\n')
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-  paragrafo3 = paragrafo.add_run(valor_monetario_por_extenso)
-  paragrafo3.bold = True
-  paragrafo3.font.size = Pt(12)
-  paragrafo3.font.name = 'Arial'
 
-  paragrafo4 = paragrafo.add_run(', referente Nota Fiscal nº ')
-  paragrafo4.font.size = Pt(12)
-  paragrafo4.font.name = 'Arial'
+    processo = num_processo.add_run(f'Processo n° {processo_fl}')
+    processo.bold = True
+    processo.font.size = Pt(12)
+    processo.font.name = 'Arial'
 
-  paragrafo5 = paragrafo.add_run(nota_fiscal)
-  paragrafo5.bold = True
-  paragrafo5.font.size = Pt(12)
-  paragrafo5.font.name = 'Arial'
 
-  paragrafo6 = paragrafo.add_run(emissão)
-  paragrafo6.bold = True
-  paragrafo6.font.size = Pt(12)
-  paragrafo6.font.name = 'Arial'
-
-  paragrafo7 = paragrafo.add_run(', associado aos serviços prestados no período de ')
-  paragrafo7.font.size = Pt(12)
-  paragrafo7.font.name  ='Arial'
-
-  paragrafo8 = paragrafo.add_run(periodo)
-  paragrafo8.bold = True
-  paragrafo8.font.size = Pt(12)
-  paragrafo8.font.name = 'Arial'
-
-  paragrafo8 = paragrafo.add_run(', apresentada pela empresa ')
-  paragrafo8.font.size = Pt(12)
-  paragrafo8.font.name = 'Arial'
-
-  paragrafo8 = paragrafo.add_run(empresa)
-  paragrafo8.bold = True
-  paragrafo8.font.size = Pt(12)
-  paragrafo8.font.name  ='Arial'
-
-  paragrafo8 = paragrafo.add_run('. Como objeto de ')
-  paragrafo8.font.size = Pt(12)
-  paragrafo8.font.name = 'Arial'
-
-  paragrafo8 = paragrafo.add_run(objeto)
-  paragrafo8.bold = True
-  paragrafo8.font.size = Pt(12)
-  paragrafo8.font.name = 'Arial'
-
-  paragrafo8 = paragrafo.add_run(', lastreado no ')
-  paragrafo8.font.size = Pt(12)
-  paragrafo8.font.name = 'Arial'
-
-  paragrafo8 = paragrafo.add_run('Termo nº 01-001/2022, T.A nº 03-004/2023 e T.A nº 03-002/2024.')
-  paragrafo8.bold = True
-  paragrafo8.font.size = Pt(12)
-  paragrafo8.font.name = 'Arial'
-
-  paragrafo8 = paragrafo.add_run('\n        O exame da documentação associada ao presente pleito, nos termos do decreto supracitado, no âmbito das responsabilidades desta Secretaria Municipal de Saúde, foi considerado ')
-  paragrafo8.font.size = Pt(12)
-  paragrafo8.font.name = 'Arial'
-
-  paragrafo8 = paragrafo.add_run('SEM RESSALVAS.')
-  paragrafo8.bold = True
-  paragrafo8.font.size = Pt(12)
-  paragrafo8.font.name = 'Arial'
-
-
-  # Notas atestadas
-  paragrafo = doc.add_paragraph()
-  paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-  paragraph_format = paragrafo.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  paragrafo.paragraph_format.left_indent = Inches(1.5)
-
-
-  atesto = paragrafo.add_run(f'1. Nota Fiscal nº {nota_fiscal1} atestada por {fiscais}.')
-  atesto.font.size = Pt(11)
-  atesto.font.name = 'Arial'
-
-  atesto = paragrafo.add_run(f'\n\n2. Relatório de fiscalização assinado por {fiscais}.')
-  atesto.font.size = Pt(11)
-  atesto.font.name = 'Arial'
-
-  atesto = paragrafo.add_run()
-  atesto.font.size = Pt(11)
-  atesto.font.name = 'Arial'
-
-  atesto = paragrafo.add_run()
-  atesto.font.size = Pt(11)
-  atesto.font.name = 'Arial'
-
-
-
-
-
-  # Data
-
-  # Cidade e Data
-
-  data = doc.add_paragraph()
-  data.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-  data1 = data.add_run('\nDuque de Caxias, ')
-  data1.bold = True
-  data1.font.size = Pt(11)
-  data1.font.name = 'Arial'
-  data1 = data.add_run(dia)
-  data1.bold = True
-  data1.font.size = Pt(11)
-  data1.font.name = 'Arial'
-  data1 = data.add_run(' de ')
-  data1.bold = True
-  data1.font.size = Pt(11)
-  data1.font.name = 'Arial'
-  data1 = data.add_run(nome_mes)
-  data1.bold = True
-  data1.font.size = Pt(11)
-  data1.font.name = 'Arial'
-  data1 = data.add_run(' de ')
-  data1.bold = True
-  data1.font.size = Pt(11)
-  data1.font.name = 'Arial'
-  data1 = data.add_run(ano)
-  data1.bold = True
-  data1.font.size = Pt(11)
-  data1.font.name = 'Arial'
-  data1 = data.add_run('.')
-  data1.bold = True
-  data1.font.size = Pt(11)
-  data1.font.name = 'Arial'
-
-
-
-  # Secretaria
-  assinatura = doc.add_paragraph()
-  assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-  paragraph_format = assinatura.paragraph_format
-  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-  assinatura1 = assinatura.add_run("\n\n\nCélia Serrano da Silva ")
-  assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-  assinatura1.bold = True
-  assinatura1.font.size = Pt(11)
-  assinatura1.font.name = 'Arial'
-
-  assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(11)
-  assinaturasec.font.name = 'Arial'
-
-  assinaturasec = assinatura.add_run("\nMat. 23098-0")
-  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-  assinaturasec.font.size = Pt(11)
-  assinaturasec.font.name = 'Arial'
-
-
-
-  end_time = time.time()
-
-  processo_planilha = str(row['PROCESSO'])
-  processo = processo_planilha.replace('/','.')
-
-
-  doc.save(f'/content/drive/MyDrive/PROHEALTH/{processo} - {nome}.docx')
-  print(f"Autorizo para {nome} gerado com sucesso!")
+    paragrafo = doc.add_paragraph()
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo1 = paragrafo.add_run('        Nos termos do Decreto 8.641 de 02 de janeiro de 2024, ')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('AUTORIZO')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(' o pagamento do Administrativo acima mencionado no valor de ')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo2 = paragrafo.add_run(valor)
+    paragrafo2.bold = True
+    paragrafo2.font.size = Pt(12)
+    paragrafo2.font.name = 'Arial'
+
+    paragrafo3 = paragrafo.add_run(valor_monetario_por_extenso)
+    paragrafo3.bold = True
+    paragrafo3.font.size = Pt(12)
+    paragrafo3.font.name = 'Arial'
+
+    paragrafo4 = paragrafo.add_run(', referente Nota Fiscal nº ')
+    paragrafo4.font.size = Pt(12)
+    paragrafo4.font.name = 'Arial'
+
+    paragrafo5 = paragrafo.add_run(nota_fiscal)
+    paragrafo5.bold = True
+    paragrafo5.font.size = Pt(12)
+    paragrafo5.font.name = 'Arial'
+
+    paragrafo6 = paragrafo.add_run(emissão)
+    paragrafo6.bold = True
+    paragrafo6.font.size = Pt(12)
+    paragrafo6.font.name = 'Arial'
+
+    paragrafo7 = paragrafo.add_run(', associado aos serviços prestados no período de ')
+    paragrafo7.font.size = Pt(12)
+    paragrafo7.font.name  ='Arial'
+
+    paragrafo8 = paragrafo.add_run(periodo)
+    paragrafo8.bold = True
+    paragrafo8.font.size = Pt(12)
+    paragrafo8.font.name = 'Arial'
+
+    paragrafo8 = paragrafo.add_run(', apresentada pela empresa ')
+    paragrafo8.font.size = Pt(12)
+    paragrafo8.font.name = 'Arial'
+
+    paragrafo8 = paragrafo.add_run(empresa)
+    paragrafo8.bold = True
+    paragrafo8.font.size = Pt(12)
+    paragrafo8.font.name  ='Arial'
+
+    paragrafo8 = paragrafo.add_run('. Como objeto de ')
+    paragrafo8.font.size = Pt(12)
+    paragrafo8.font.name = 'Arial'
+
+    paragrafo8 = paragrafo.add_run(objeto)
+    paragrafo8.bold = True
+    paragrafo8.font.size = Pt(12)
+    paragrafo8.font.name = 'Arial'
+
+    paragrafo8 = paragrafo.add_run(', lastreado no ')
+    paragrafo8.font.size = Pt(12)
+    paragrafo8.font.name = 'Arial'
+
+    paragrafo8 = paragrafo.add_run('Termo nº 01-001/2022, T.A nº 03-004/2023 e T.A nº 03-002/2024.')
+    paragrafo8.bold = True
+    paragrafo8.font.size = Pt(12)
+    paragrafo8.font.name = 'Arial'
+
+    paragrafo8 = paragrafo.add_run('\n        O exame da documentação associada ao presente pleito, nos termos do decreto supracitado, no âmbito das responsabilidades desta Secretaria Municipal de Saúde, foi considerado ')
+    paragrafo8.font.size = Pt(12)
+    paragrafo8.font.name = 'Arial'
+
+    paragrafo8 = paragrafo.add_run('SEM RESSALVAS.')
+    paragrafo8.bold = True
+    paragrafo8.font.size = Pt(12)
+    paragrafo8.font.name = 'Arial'
+
+
+    # Notas atestadas
+    paragrafo = doc.add_paragraph()
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo.paragraph_format.left_indent = Inches(1.5)
+
+
+    atesto = paragrafo.add_run(f'1. Nota Fiscal nº {nota_fiscal1} atestada por {fiscais}.')
+    atesto.font.size = Pt(11)
+    atesto.font.name = 'Arial'
+
+    atesto = paragrafo.add_run(f'\n\n2. Relatório de fiscalização assinado por {relatorio}.')
+    atesto.font.size = Pt(11)
+    atesto.font.name = 'Arial'
+
+    atesto = paragrafo.add_run()
+    atesto.font.size = Pt(11)
+    atesto.font.name = 'Arial'
+
+    atesto = paragrafo.add_run()
+    atesto.font.size = Pt(11)
+    atesto.font.name = 'Arial'
+
+
+
+
+
+    # Data
+
+    # Cidade e Data
+
+    data = doc.add_paragraph()
+    data.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    data1 = data.add_run('\nDuque de Caxias, ')
+    data1.bold = True
+    data1.font.size = Pt(11)
+    data1.font.name = 'Arial'
+    data1 = data.add_run(dia)
+    data1.bold = True
+    data1.font.size = Pt(11)
+    data1.font.name = 'Arial'
+    data1 = data.add_run(' de ')
+    data1.bold = True
+    data1.font.size = Pt(11)
+    data1.font.name = 'Arial'
+    data1 = data.add_run(nome_mes)
+    data1.bold = True
+    data1.font.size = Pt(11)
+    data1.font.name = 'Arial'
+    data1 = data.add_run(' de ')
+    data1.bold = True
+    data1.font.size = Pt(11)
+    data1.font.name = 'Arial'
+    data1 = data.add_run(ano)
+    data1.bold = True
+    data1.font.size = Pt(11)
+    data1.font.name = 'Arial'
+    data1 = data.add_run('.')
+    data1.bold = True
+    data1.font.size = Pt(11)
+    data1.font.name = 'Arial'
+
+
+
+    # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    assinatura1 = assinatura.add_run("\n\n\nCélia Serrano da Silva ")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(11)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(11)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nMat. 23098-0")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(11)
+    assinaturasec.font.name = 'Arial'
+
+
+
+    end_time = time.time()
+
+    processo_planilha = str(row['PROCESSO'])
+    processo = processo_planilha.replace('/','.')
+
+
+    doc.save(f'/content/drive/MyDrive/PROHEALTH/{processo}.docx')
+    print(f"Autorizo para {nome} gerado com sucesso!")
+
+
+
+    doc.add_page_break()
 
 
 
@@ -2514,6 +2347,10 @@ for index, row in tabela.iterrows():
 
 execution_time = end_time - start_time
 print(f'Tempo de execução: {execution_time} segundos')
+
+tabela = pd.DataFrame(Prohealth.get_all_records())
+tabela = tabela.iloc[:,0:5]
+tabela
 
 """# Saída"""
 
@@ -2663,3 +2500,2506 @@ len(despachos)
 
 agrupados
 
+"""# DESPACHO  - GABINETE"""
+
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt, RGBColor, Inches
+from docx.oxml.ns import qn
+from datetime import datetime
+import time
+import pandas as pd
+from num2words import num2words
+
+start_time = time.time()
+
+# LISTA DE PROCESSOS PARA INSTRUÇÃO
+
+sheet_title = 'Dados TAC'
+despachos = gc.open('Dados TAC').worksheet('Despachos').get_all_records()
+
+
+# DATA FRAMES
+despachos = pd.DataFrame(despachos)
+
+
+
+# Informações
+
+for processo in despachos:
+  doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
+
+  section = doc.sections[0]
+  section.left_margin = Inches(0.8)
+  section.right_margin = Inches(0.8)
+
+
+
+
+
+  for index, row in despachos.iterrows():
+
+    processo = row['PROCESSO']
+    folha = row['FOLHA'] + 1
+
+
+  # Despacho
+
+    dia = str(datetime.now().strftime("%d"))
+    mes_atual = datetime.now().month
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+              "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    nome_mes = meses[mes_atual - 1]
+    ano = str(datetime.now().year)
+
+
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo = num_processo.add_run(f'\nProcesso n° {processo} FL {folha}')
+    paragrafo.bold = True
+    paragrafo.font.size = Pt(11)
+    paragrafo.font.name = 'Arial'
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo = num_processo.add_run('DESPACHO')
+    paragrafo.font.underline = True
+    paragrafo.bold = True
+    paragrafo.font.size = Pt(12)
+    paragrafo.font.name = 'Arial'
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo = num_processo.add_run(f'À Subsecretaria de Gestão')
+    paragrafo.bold = True
+    paragrafo.font.size = Pt(12)
+    paragrafo.font.name = 'Arial'
+
+    paragrafo = doc.add_paragraph()
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo1 = paragrafo.add_run('      Cumprimentando-os, cordialmente, servimo-nos do presente para informar que o presente processo de Reconhecimento de Dívida, após a devida instrução, retornou da Procuradoria Geral do Município de Duque de Caxias – PGMDC, com exigências a serem cumpridas/esclarecidas.')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('\n\n       Neste sentido, considerando que o Reconhecimento de Dívida ou Ajuste de Contas são instrumentos excepcionais, solicitamos que seja emitida justificativa quanto à realização de procedimento de pagamento através dos mesmos, uma vez que a regra trazida pelo direito positivo vigente é a obrigatoriedade da realização de procedimento licitatório.')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('\n\n     Após a emissão da justificativa, solicitamos a devolução dos autos ao Fundo Municipal de Saúde.')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo1 = paragrafo.add_run('\n        Por fim, aproveitamos para renovar protestos de elevada estima e real consideração.')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+  # Cidade e Data
+
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\nDuque de Caxias, ')
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+
+    atenc = doc.add_paragraph()
+    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    formatação = atenc.paragraph_format
+    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    paragrafo1 = atenc.add_run('\nAtenciosamente,')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+
+  # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run("\n\nMarlon C. Lopes")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(12)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nAssistente Operacional")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(12)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nMat. 47.643.9")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(12)
+    assinaturasec.font.name = 'Arial'
+
+
+  # QUEBRA
+    doc.add_page_break()
+
+
+
+    end_time = time.time()
+
+
+
+
+    # Salvamento
+    doc.save(f'/content/drive/MyDrive/Despacho.docx')
+    print(f"Despacho para {processo} gerado com sucesso!")
+
+
+execution_time = end_time - start_time
+print(f"Tempo de execução: {execution_time} segundos")
+
+"""# Teste"""
+
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt, RGBColor, Inches
+from docx.oxml.ns import qn
+from datetime import datetime
+import time
+import pandas as pd
+from num2words import num2words
+pd.set_option('display.max_colwidth', None)
+import random
+from docx import Document
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+import os
+
+start_time = time.time()
+
+# LISTA DE PROCESSOS PARA INSTRUÇÃO
+instruir = gc.open('Dados TAC').worksheet('Instruir').get_all_records()
+base = gc.open('Base de Dados - FMS').worksheet('Objetos').get_all_records()
+
+
+# DATA FRAMES
+instruir = pd.DataFrame(instruir)
+base = pd.DataFrame(base)
+
+#
+unidades = [
+ "Hospital Municipalizado Adão Pereira Nunes",
+ "Hospital Municipal Dr. Moacyr Rodrigues do Carmo",
+ "a UPA Lafaiete",
+ "a UPA Sarapuí",
+ "Hospital Municipal do Olho Julio Candido Brito",
+ "Departamento de Farmácia"
+]
+
+sms = "atendimento às necessidades da Secretaria Municipal de Saúde"
+
+for index, row in instruir.iterrows():
+  doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
+  if row['PROCESSO'] == "":
+    break
+  else:
+    numerar_processo = row['FOLHA'] + 4
+
+    section = doc.sections[0]
+    section.left_margin = Inches(1.24)
+    section.right_margin = Inches(1.4)
+
+    fonte_proc = 10
+    fonte_padrão = 11
+    fonte_título = 12
+
+
+
+
+  # Data
+
+    dia = str(datetime.now().strftime("%d"))
+    mes_atual = datetime.now().month
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    nome_mes = meses[mes_atual - 1]
+    ano = str(datetime.now().year)
+
+
+  # Valor Monetário por extenso
+
+    valor_texto = row["VALOR"]
+    valor_numerico = valor_texto.replace(",", ".").replace(".","")
+    valor_numerico = valor_numerico.replace("$","")
+    valor_numerico = int(valor_numerico)
+    valor_numerico = valor_numerico / 100
+
+
+    def valor_monetario_por_extenso(valor_numerico):
+
+        # Separar a parte inteira e decimal do valor
+        reais, centavos = divmod(valor_numerico, 1)
+        centavos = round(centavos * 100)
+
+        # Converter a parte inteira para extenso
+        reais = num2words(reais, lang='pt_BR')
+
+        # Converter a parte decimal para extenso
+        centavos = num2words(centavos, lang='pt_BR')
+
+        if centavos == 'zero':
+          extenso_final = f'{reais} reais'
+        else: # Assign a value to extenso_final when centavos is not zero
+          extenso_final = f'{reais} reais e {centavos} centavos'
+
+        return extenso_final
+
+
+  # Informaões do Termo
+    nome_instrutor = row['INSTRUIDO POR:']
+    processo = str(row["PROCESSO"])
+    processo_fl = processo + f' Fl {numerar_processo}'
+    folha = row["FOLHA"]
+    num_pag_termo = folha + 4
+    num_pag_autorizo = folha + 5
+    num_pag_despacho = folha + 6
+
+  # Informaões do autorizo
+
+    numerar_processo2 = numerar_processo + 1
+
+    processo = str(row["PROCESSO"])
+    processo_fll = processo + f' Fl {numerar_processo2}'
+
+
+  # Informaões do despacho
+
+    numerar_processo3 = numerar_processo2 + 1
+
+    processo = str(row["PROCESSO"])
+    processo_flll = processo + f' Fl {numerar_processo3}'
+
+
+    valor = valor_texto
+    valor2 = valor.replace("$", "R$ ")
+
+
+    valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
+    valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
+
+
+  # Notas Fiscais
+    if processo[-4:] == "2025":
+      expected_headers = ['PROCESSO', 'NOTAS', 'EMISSÃO','DOC']
+      notas = gc.open('Dados TAC').worksheet('Notas 2025').get_all_records(expected_headers=expected_headers)
+      notas = pd.DataFrame(notas)
+    else:
+      expected_headers = ['PROCESSO', 'NOTAS', 'EMISSÃO', 'REFERÊNCIA']
+      notas = gc.open('Dados TAC').worksheet('Notas 2024').get_all_records(expected_headers=expected_headers)
+      notas = pd.DataFrame(notas)
+
+    processo = row['PROCESSO']
+    notas_processo = notas[notas['PROCESSO'] == processo]
+
+    agrupados = notas.groupby('PROCESSO')['NOTAS'].apply(lambda x: ', '.join(map(str, x))).reset_index()
+    lista_notas = agrupados.loc[agrupados['PROCESSO'] == processo, 'NOTAS'].to_string(index = False)
+
+
+    notas_filtradas = notas[notas['PROCESSO'] == processo]
+    qtd_notas = len(notas_filtradas)
+
+
+    if tipo == 'DNF' and qtd_notas > 1:
+      num_notas = 'das DANFES'
+
+      num_notas = 'das DANFES'
+
+    elif tipo == 'DNF' and qtd_notas == 1:
+      num_notas = 'da DANFE'
+
+
+    elif tipo == 'NF' and qtd_notas > 1:
+      num_notas = 'das Notas Fiscais'
+
+    elif  tipo == 'NF' and qtd_notas == 1:
+      num_notas = 'da Nota Fiscal'
+
+    elif tipo == 'FL' and qtd_notas > 1:
+      num_notas = 'das faturas de locação'
+
+    elif tipo == 'FL' and qtd_notas == 1:
+      num_notas = 'da fatura de locação'
+
+    else:
+      num_notas = 'TIPO DE DOCUMENTO NÃO ESPECIFICADO NA PLANILHA'
+
+
+    if tipo == 'DNF':
+      tipo_nota = 'DANFE'
+
+    elif tipo == 'FL':
+      tipo_nota = 'Fatura de Locação'
+
+
+    elif tipo == 'NF':
+      tipo_nota = 'Nota Fiscal'
+
+
+  # Emitida
+    if qtd_notas > 1:
+      emitida = ' emitidas'
+
+    else:
+      emitida = ' emitida'
+
+
+  # Data de emissão
+
+    notas['EMISSÃO'] = pd.to_datetime(notas['EMISSÃO'], dayfirst=True, errors='coerce')
+
+    emissao = notas[notas['PROCESSO'] == processo]
+
+    maior_data = emissao['EMISSÃO'].max()
+    menor_data = emissao['EMISSÃO'].min()
+
+    if maior_data == menor_data:
+      data_emissao = maior_data.strftime("%d/%m/%Y")
+    else:
+      data_emissao = f"{menor_data.strftime('%d/%m/%Y')} à {maior_data.strftime('%d/%m/%Y')}"
+
+  # Informações
+
+    cnpj = row["CNPJ"]
+    periodo_inicial = row["PERÍODO INICIAL"]
+    periodo_final = row["PERÍODO FINAL"]
+    if periodo_inicial == periodo_final:
+      periodo = periodo_inicial
+    else:
+      periodo = periodo_inicial + ' à ' + periodo_final
+    qtd_barras = data_emissao.count("/")
+    empresa = row["EMPRESA"]
+    objeto = row["OBJETO"]
+    notas_fiscais = str(lista_notas)
+    objeto_categoria = base[base['OBJETO'] == objeto]
+    categoria = objeto_categoria['CATEGORIA'].values
+    if categoria == 'MEDICAMENTOS' or categoria == 'MATERIAIS HOSPITALARES':
+      for i in unidades:
+        if str(i) in str(objeto):
+          objeto = objeto.replace(str(i), str(sms))
+        else:
+          continue
+    else:
+      pass
+
+    ano_atual = str(datetime.now().year)
+
+    ano_referencia = periodo.split('/')
+    ano_referencia = str(ano_referencia[-1])
+
+    if ano_referencia == ano_atual:
+      termo = 'TERMO DE AJUSTE DE CONTAS'
+
+    else:
+      termo = 'TERMO DE RECONHECIMENTO DE DÍVIDA'
+
+
+  # Preposição depois de 'emitida' (em/de)
+    if qtd_barras == 2:
+      preposicao_emitida = ' em '
+
+    else:
+      preposicao_emitida = ' de '
+
+
+  # TERMO
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('FL.: ')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run(f'    {num_pag_termo}    ')
+    paragrafo1.underline = True
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('  Rubrica:________')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo = doc.add_paragraph('\n')
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    paragrafo1 = paragrafo.add_run(termo)
+    paragrafo1.font.color.rgb = RGBColor(0, 0, 0)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo = doc.add_paragraph('\n')
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    paragrafo1 = paragrafo.add_run('             Fica reconhecida a dívida referente à ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(objeto)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    if tipo == 'DNF':
+      if data_emissao != periodo:
+        paragrafo1 = paragrafo.add_run(' no período de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+        paragrafo1 = paragrafo.add_run(periodo)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+      else:
+        pass
+
+    else:
+      paragrafo1 = paragrafo.add_run(' no período de ')
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+      paragrafo1 = paragrafo.add_run(periodo)
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+
+
+    paragrafo1 = paragrafo.add_run(f', decorrente {num_notas} n° ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    notas_fiscais = str(notas_fiscais)
+    paragrafo1 = paragrafo.add_run(notas_fiscais)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(emitida)
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(preposicao_emitida)
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(data_emissao)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo1 = paragrafo.add_run(', perfazendo o valor total de ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(valor2)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(', encartada ao processo em epígrafe em favor da pessoa jurídica ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(empresa)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(', inscrita no CNPJ sob o n.º ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(cnpj)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('.')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+  # Cidade e Data
+
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\nDuque de Caxias, ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+
+
+  # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run("\n\n\nCÉLIA SERRANO DA SILVA ")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(12)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(12)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nMat. 23098-0")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(12)
+    assinaturasec.font.name = 'Arial'
+
+
+
+  # QUEBRA
+    doc.add_page_break()
+
+
+  # AUTORIZO
+
+
+    num_processo = doc.add_paragraph('\n')
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('FL.: ')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run(f'    {num_pag_autorizo}    ')
+    paragrafo1.underline = True
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('  Rubrica:________')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo = doc.add_paragraph('\n\n')
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    paragrafo1 = paragrafo.add_run('              Nos termos do Decreto 8.641, de 02 de janeiro de 2024, ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('AUTORIZO')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(' o Pagamento do presente processo administrativo no valor de ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(valor2)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(f', decorrente {num_notas} n° ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(notas_fiscais)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(emitida)
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(preposicao_emitida)
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(data_emissao)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(', pela pessoa jurídica ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(empresa)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo1 = paragrafo.add_run(', referente aos serviços de ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(f'{objeto}')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    if tipo == 'DNF':
+      if data_emissao != periodo:
+        paragrafo1 = paragrafo.add_run(' no período de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+        paragrafo1 = paragrafo.add_run(f'{periodo}.')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+      else:
+        paragrafo1 = paragrafo.add_run(f'.')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+    else:
+      paragrafo1 = paragrafo.add_run(' no período de ')
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+      paragrafo1 = paragrafo.add_run(f'{periodo}.')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('\n\n	   O exame da documentação associada ao presente pleito, nos termos do decreto supracitado, no âmbito das responsabilidades desta Secretaria Municipal de Saúde, foi considerado ')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run('SEM RESSALVAS.')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+  # Atesto notas fiscais
+
+    if tipo == 'DNF' and qtd_notas > 1:
+      docf = 'DANFES'
+
+    elif tipo == 'DNF' and qtd_notas == 1:
+      docf = 'DANFE'
+
+    elif tipo == 'NF' and qtd_notas > 1:
+      docf = 'Notas Fiscais'
+
+    elif tipo == 'NF' and qtd_notas == 1:
+      docf = 'Nota Fiscal'
+
+    elif tipo == 'FL' and qtd_notas > 1:
+      docf = 'Faturas de Locação'
+
+    elif tipo == 'FL' and qtd_notas == 1:
+      docf = 'Fatura de Locação'
+
+    else:
+      num_notas = 'TIPO DE DOCUMENTO NÃO ESPECIFICADO NA PLANILHA'
+
+    paragrafox = doc.add_paragraph()
+    paragrafox.paragraph_format.left_indent = Inches(1.5)
+    paragrafox.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+
+    for index, row in notas_processo.iterrows():
+      processo = row['PROCESSO']
+      nota = row['NOTAS']
+      fiscais = row['FISCAL NOTA']
+      emissao = row['EMISSÃO']
+      fiscal_unico = fiscais[0]
+      doc_unico = tipo[0]
+      if tipo == doc_unico:
+        if fiscais == fiscal_unico:
+          paragrafo1 = paragrafox.add_run(f'1. {docf} n° ')
+          paragrafo1.font.size = Pt(11)
+          paragrafo1.font.name = 'Arial'
+          for nota in notas_processo['NOTAS']:
+            paragrafo1 = paragrafox.add_run(f'{nota}')
+            paragrafo1.font.size = Pt(11)
+            paragrafo1.font.name = 'Arial'
+
+          paragrafo1 = paragrafox.add_run(f' atestadas por: ')
+          paragrafo1.font.size = Pt(11)
+          paragrafo1.font.name = 'Arial'
+
+          paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+          paragrafo1.font.size = Pt(11)
+          paragrafo1.bold = True
+          paragrafo1.font.name = 'Arial'
+        else:
+           paragrafo1 = paragrafox.add_run(f'1. {docf} n° {notas_fiscais}')
+           paragrafo1.font.size = Pt(11)
+           paragrafo1.font.name = 'Arial'
+           paragrafo1 = paragrafox.add_run(f' atestadas por: ')
+           paragrafo1.font.size = Pt(11)
+           paragrafo1.font.name = 'Arial'
+           paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+           paragrafo1.font.size = Pt(11)
+           paragrafo1.bold = True
+           paragrafo1.font.name = 'Arial'
+      elif tipo != doc_unico:
+        if fiscais == fiscal_unico:
+          for d in tipo:
+            paragrafo1 = paragrafox.add_run(f'1. {docf} n° ')
+            paragrafo1.font.size = Pt(11)
+            paragrafo1.font.name = 'Arial'
+            paragrafo1 = paragrafox.add_run(f'{nota}')
+            paragrafo1.font.size = Pt(11)
+            paragrafo1.font.name = 'Arial'
+          paragrafo1 = paragrafox.add_run(f' atestadas por: ')
+          paragrafo1.font.size = Pt(11)
+          paragrafo1.font.name = 'Arial'
+
+          paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+          paragrafo1.font.size = Pt(11)
+          paragrafo1.bold = True
+          paragrafo1.font.name = 'Arial'
+
+        else:
+          paragrafo1 = paragrafox.add_run(f'1. {docf} n° {notas_fiscais}')
+          paragrafo1.font.size = Pt(11)
+          paragrafo1.font.name = 'Arial'
+          paragrafo1 = paragrafox.add_run(f' atestadas por: ')
+          paragrafo1.font.size = Pt(11)
+          paragrafo1.font.name = 'Arial'
+          paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+          paragrafo1.font.size = Pt(11)
+          paragrafo1.bold = True
+          paragrafo1.font.name = 'Arial'
+
+  # Cidade e Data
+
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\nDuque de Caxias, ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+
+
+  # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run("\n\n\nCÉLIA SERRANO DA SILVA")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(fonte_padrão)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nMat. 23098-0")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+
+    # QUEBRA
+    doc.add_page_break()
+
+
+  # Despacho
+
+    if nome_instrutor == 'Lorrayne':
+      instrutor = 'Lorrayne Albuquerque'
+      cargo = 'Assistente Operacional'
+      mat = 'Mat. 44.537-1'
+    elif nome_instrutor == 'Carol':
+      instrutor = 'Carolina Bandeira'
+      cargo = 'Coordenadora de Instrução Processual'
+      mat = 'Mat. 43.385-3'
+    elif nome_instrutor == 'Marlon':
+      instrutor = 'Marlon Lopes'
+      cargo = 'Assistente Operacional'
+      mat = 'Mat. 47.643-9'
+    elif nome_instrutor == 'Letícia':
+      instrutor = 'Letícia Pimenta'
+      cargo = 'Assistente Operacional'
+      mat = 'Mat. 46.988-2'
+
+    num_processo = doc.add_paragraph('\n\n')
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('FL.: ')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run(f'    {num_pag_despacho}    ')
+    paragrafo1.bold = True
+    paragrafo1.underline = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('  Rubrica:________')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo = num_processo.add_run('\nDESPACHO')
+    paragrafo.font.underline = True
+    paragrafo.bold = True
+    paragrafo.font.size = Pt(fonte_padrão)
+    paragrafo.font.name = 'Arial'
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo = num_processo.add_run(f'\nÀ Procuradoria Geral do Município.\n')
+    paragrafo.font.size = Pt(fonte_padrão)
+    paragrafo.font.name = 'Arial'
+
+    paragrafo = doc.add_paragraph()
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo1 = paragrafo.add_run('        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento através de Ajuste de Contas/Reconhecimento de Dívida, com base nos documentos encartados aos autos.')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+
+  # Cidade e Data
+
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+
+    atenc = doc.add_paragraph()
+    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    formatação = atenc.paragraph_format
+    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run(f"\n\n{instrutor}")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(fonte_padrão)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run(f"\n{cargo}")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run(f"\n{mat}")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+
+    atenc = doc.add_paragraph()
+    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    formatação = atenc.paragraph_format
+    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+
+    # Revisão
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run("\n\nCarolina Bandeira")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(fonte_padrão)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nCoordenadora de Instrução Processual")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nMat. 43.385-3")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+
+  # Nome do arquivo
+
+    nome_arquivo = processo.replace('/','.')
+
+    end_time = time.time()
+
+
+
+    # Salvamento
+    caminho = f'/content/drive/MyDrive/TERMOS E AUTORIZOS/{empresa}'
+
+    if os.path.exists(caminho):
+      pass
+    else:
+      os.makedirs(caminho)
+
+    doc.save(f'{caminho}/{nome_arquivo}.docx')
+    print(f"Autorizo para processo nº {processo} gerado com sucesso!")
+
+
+execution_time = end_time - start_time
+print(f"Tempo de execução: {execution_time:.1f} segundos")
+
+"""#DESPACHO - SIGFIS
+
+"""
+
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt, RGBColor, Inches
+from docx.oxml.ns import qn
+from datetime import datetime
+import time
+import pandas as pd
+from num2words import num2words
+
+start_time = time.time()
+
+
+# Planilha
+sigfis_tac = gc.open('Dados TAC').get_worksheet(5).get_all_records()
+sigfis_rec = gc.open('Dados TAC').get_worksheet(6).get_all_records()
+
+# Filtrar apenas duas colunas específicas
+colunas = ['Processo', 'Folha']
+dados_filtrados1 = [{col: linha[col] for col in colunas if col in linha} for linha in sigfis_tac]
+dados_filtrados2 = [{col: linha[col] for col in colunas if col in linha} for linha in sigfis_rec]
+dados_totais = dados_filtrados1 + dados_filtrados2
+
+
+# Iterar pelas linhas filtradas
+for linha in dados_totais:
+  # Verificar se a linha tem valores válidos nas colunas desejadas
+  if not linha['Processo'] or not linha['Folha']:
+      continue  # Ignorar linhas vazias
+  else:
+    processo = linha['Processo']
+    folha = linha['Folha']
+    folha = int(folha) + 6
+
+  # Despacho
+
+    doc = Document('/content/drive/MyDrive/Despacho.CCP.docx')
+
+
+    dia = str(datetime.now().strftime("%d"))
+    mes_atual = datetime.now().month
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+              "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    nome_mes = meses[mes_atual - 1]
+    ano = str(datetime.now().year)
+
+    paragrafo.text = paragrafo.text.replace('xxxxxxxxxx',f'Processo:{processo} Folha: {folha}')
+
+
+
+  # Cidade e Data
+
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\nDuque de Caxias, ')
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(ano)
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.bold = True
+    cd1.font.size = Pt(12)
+    cd1.font.name = 'Arial'
+
+ # QUEBRA
+    doc.add_page_break()
+
+
+
+    end_time = time.time()
+
+
+    print(f"Despacho para {processo} gerado com sucesso!")
+
+    # Salvamento
+doc.save(f'/content/drive/MyDrive/Despacho.CCP.docx')
+
+
+
+execution_time = end_time - start_time
+print(f"Tempo de execução: {execution_time} segundos")
+
+function acionarBotaoSite() {
+  var url = "https://colab.research.google.com/drive/1XB2X3UsUicPo_bnqI5a7uNzLKsYW3831#scrollTo=Fm-jBOBfhG37"; // Substitua pelo endereço do site
+
+  // Configurações da requisição
+  var options = {
+    method: "post", // ou "get", dependendo da ação
+    headers: {
+      "Content-Type": "application/json", // Ajuste conforme necessário
+    },
+    payload: JSON.stringify({
+      action: "click",
+      element: "botaoID"
+    })
+  };
+
+  // Envia a requisição HTTP
+  var response = UrlFetchApp.fetch(url, options);
+  Logger.log(response.getContentText());
+}
+
+"""# Classificação"""
+
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt, RGBColor, Inches
+from docx.oxml.ns import qn
+from datetime import datetime
+import time
+import pandas as pd
+from num2words import num2words
+pd.set_option('display.max_colwidth', None)
+import random
+from docx import Document
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+start_time = time.time()
+
+# LISTA DE PROCESSOS PARA INSTRUÇÃO
+
+sheet_title = 'Classificação - FMS'
+troca = gc.open('Classificação - FMS').worksheet("Troca").get_all_records()
+
+
+# DATA FRAMES
+troca = pd.DataFrame(troca)
+
+doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
+
+section = doc.sections[0]
+section.left_margin = Inches(1)
+section.right_margin = Inches(1)
+
+for index, row in troca.iterrows():
+
+
+  # Data
+
+  dia = str(datetime.now().strftime("%d"))
+  mes_atual = datetime.now().month
+  meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+  nome_mes = meses[mes_atual - 1]
+  ano = str(datetime.now().year)
+
+
+  # Valor Monetário por extenso
+
+  valor_texto = row['VALOR']
+  valor_numerico = valor_texto.replace(",", ".").replace(".","")
+  valor_numerico = valor_numerico.replace("$","")
+  valor_numerico = int(valor_numerico)
+  valor_numerico = valor_numerico / 100
+
+  def valor_monetario_por_extenso(valor_numerico):
+      # Separar a parte inteira e decimal do valor
+      reais, centavos = divmod(valor_numerico, 1)
+      centavos = round(centavos * 100)
+
+      # Converter a parte inteira para extenso
+      reais = num2words(reais, lang='pt_BR')
+
+      # Converter a parte decimal para extenso
+      centavos = num2words(centavos, lang='pt_BR')
+
+      if centavos == 'zero':
+        extenso_final = f'{reais} reais'
+      else: # Assign a value to extenso_final when centavos is not zero
+        extenso_final = f'{reais} reais e {centavos} centavos'
+
+      return extenso_final
+
+  # Informações
+
+  processo = str(row['PROCESSO'])
+
+  valor = valor_texto
+  valor = 'R' + valor + ' '
+
+  valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
+  valor_monetario_por_extenso = '('+ valor_monetario_por_extenso + ')'
+
+  liquidação_simples = row['LIQUIDAÇÃO']
+  liquidação_modificado = str(liquidação_simples) + '/2024'
+  empenho_simples = row['EMPENHO']
+  empenho_modificado = str(empenho_simples) + '/2024'
+  estorno = row["ESTORNO"]
+  justificativa = row["JUSTIFICATIVA"]
+
+
+  num_processo = doc.add_paragraph('\n')
+  num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+  paragraph_format = num_processo.paragraph_format
+  paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+  paragrafo1 = num_processo.add_run(f'\nProc. Adm. n° {processo}\n')
+  paragrafo1.bold = True
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+
+  paragrafo1 = num_processo.add_run('  Rubrica:_________ ')
+  paragrafo1.bold = True
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  paragrafo1 = num_processo.add_run('FL.:______ ')
+  paragrafo1.bold = True
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+
+  paragrafo = doc.add_paragraph()
+  paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+  paragraph_format = paragrafo.paragraph_format
+  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+  liquidação_vazia = pd.isna(liquidação_simples) or liquidação_simples == ''
+  empenho_vazio = pd.isna(empenho_simples) or empenho_simples == ''
+
+  if not liquidação_vazia and not empenho_vazio:
+      paragrafo1 = paragrafo.add_run("\nESTORNO DE LIQUIDAÇÃO E EMPENHO")
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(12)
+      paragrafo1.font.name = 'Arial'
+  elif liquidação_vazia and not empenho_vazio:
+      paragrafo1 = paragrafo.add_run("\nESTORNO DE EMPENHO")
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(12)
+      paragrafo1.font.name = 'Arial'
+  elif not liquidação_vazia and empenho_vazio:
+      paragrafo1 = paragrafo.add_run("\nESTORNO DE LIQUIDAÇÃO")
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(12)
+      paragrafo1.font.name = 'Arial'
+  else:
+      paragrafo1 = paragrafo.add_run("\nERRO NO PREENCHIMENTO, VERIFIQUE A PLANILHA")
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(12)
+      paragrafo1.font.name = 'Arial'
+
+  paragrafo = doc.add_paragraph()
+  paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+  paragraph_format = paragrafo.paragraph_format
+  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+  paragrafo1 = paragrafo.add_run('        Servimo-nos deste, para solicitar o estorno ')
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  paragrafo1 = paragrafo.add_run(estorno)
+  paragrafo1.bold = True
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  if liquidação_simples and empenho_simples != None:
+
+    paragrafo1 = paragrafo.add_run(' da Liquidação ')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(liquidação_modificado)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(' e do Empenho ')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(empenho_modificado)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+  elif liquidação_simples == None:
+
+    paragrafo1 = paragrafo.add_run(' do Empenho ')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(empenho_modificado)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+  elif empenho_simples == None:
+
+    paragrafo1 = paragrafo.add_run(' da Liquidação ')
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafo.add_run(liquidação_modificado)
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+  else:
+
+    paragrafo1 = paragrafo.add_run("\nERRO NO PREENCHIMENTO, VERIFIQUE A PLANILHA")
+    paragrafo1.font.underline = True
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(12)
+    paragrafo1.font.name = 'Arial'
+
+
+  paragrafo1 = paragrafo.add_run(' no valor de ')
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  paragrafo1 = paragrafo.add_run(valor)
+  paragrafo1.bold = True
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
+  paragrafo1.bold = True
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  paragrafo1 = paragrafo.add_run('.')
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  paragrafo1 = paragrafo.add_run('\n        O Estorno se justifica ')
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  paragrafo1 = paragrafo.add_run(justificativa)
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  paragrafo1 = paragrafo.add_run('.')
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+  paragrafo1 = paragrafo.add_run('\n\n             Sendo o que nos cumpre, renovamos nossos protestos de elevada estima e real consideração.')
+  paragrafo1.font.size = Pt(12)
+  paragrafo1.font.name = 'Arial'
+
+
+      # Cidade e Data
+
+  data = doc.add_paragraph()
+  data.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+  data1 = data.add_run('\nDuque de Caxias, ')
+  data1.bold = True
+  data1.font.size = Pt(12)
+  data1.font.name = 'Arial'
+  data1 = data.add_run(dia)
+  data1.bold = True
+  data1.font.size = Pt(12)
+  data1.font.name = 'Arial'
+  data1 = data.add_run(' de ')
+  data1.bold = True
+  data1.font.size = Pt(12)
+  data1.font.name = 'Arial'
+  data1 = data.add_run(nome_mes)
+  data1.bold = True
+  data1.font.size = Pt(12)
+  data1.font.name = 'Arial'
+  data1 = data.add_run(' de ')
+  data1.bold = True
+  data1.font.size = Pt(12)
+  data1.font.name = 'Arial'
+  data1 = data.add_run(ano)
+  data1.bold = True
+  data1.font.size = Pt(12)
+  data1.font.name = 'Arial'
+  data1 = data.add_run('.')
+  data1.bold = True
+  data1.font.size = Pt(12)
+  data1.font.name = 'Arial'
+
+
+
+  # Secretaria
+  assinatura = doc.add_paragraph()
+  assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+  paragraph_format = assinatura.paragraph_format
+  paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+  assinatura1 = assinatura.add_run("\n\n\nCÉLIA SERRANO DA SILVA ")
+  assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+  assinatura1.bold = True
+  assinatura1.font.size = Pt(12)
+  assinatura1.font.name = 'Arial'
+
+  assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+  assinaturasec.font.size = Pt(12)
+  assinaturasec.font.name = 'Arial'
+
+  assinaturasec = assinatura.add_run("\nMat. 23098-0")
+  assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+  assinaturasec.font.size = Pt(12)
+  assinaturasec.font.name = 'Arial'
+
+
+
+  end_time = time.time()
+
+
+
+  doc.add_page_break()
+
+
+doc.save(f'/content/drive/MyDrive/teste_troca_de_fonte.docx')
+print(f"Autorizo gerado com sucesso!")
+
+
+
+
+
+
+
+execution_time = end_time - start_time
+print(f'Tempo de execução: {execution_time} segundos')
+
+"""# cotações"""
+
+!pip install pydrive
+
+from datetime import datetime
+import time
+import pandas as pd
+from pydrive.drive import GoogleDrive
+
+
+start_time = time.time()
+
+# LISTA DE PROCESSOS PARA INSTRUÇÃO
+
+sheet_title = '014/001815/2024'
+cotacoes = gc.open('014/001815/2024').worksheet("Cotações").get_all_records()
+
+
+df_cotacoes = pd.DataFrame(cotacoes)
+
+df_cotacoes['Participante'] = df_cotacoes['Participante'].astype(str)
+
+cotacoes = df_cotacoes.drop(columns = ['CÓDIGO','SEARCHKEY','ITEM','EMPRESA', 'VALOR OFERTADO'])
+print(cotacoes)
+
+
+
+todas_situacoes = list(range(1, 1))
+
+# Função para completar as situações
+def completar_situacoes(grupo):
+    # Lista de situações já presentes
+    situacoes_presentes = grupo["Número Item"].tolist()
+
+    # Descobrir as situações ausentes
+    situacoes_faltantes = set(todas_situacoes) - set(situacoes_presentes)
+
+    # Criar DataFrame para as situações ausentes
+    faltantes = pd.DataFrame({
+        "Número Item": list(situacoes_faltantes),
+        "Participante": grupo["Participante"].iloc[0],  # Repetir o participante
+        "PrecoUnitario": 0.00,  # Preencher com 0.00
+        "Situacao": 2  # Preencher com 2
+    })
+
+    # Combinar o grupo original com os dados faltantes
+    return pd.concat([grupo, faltantes])
+
+# Aplicar a função para cada participante
+cotacoes = cotacoes.groupby("Participante").apply(completar_situacoes).reset_index(drop=True)
+
+# Ordenar pelo participante e pela situação
+cotacoes = cotacoes.sort_values(by=["Participante", "Número Item"])
+
+dfs_por_empresa = {}
+
+# Iterar sobre os nomes das empresas únicos
+for empresa in cotacoes["Participante"].unique():
+    # Filtrar o DataFrame por empresa
+    df_filtrado = cotacoes[cotacoes["Participante"] == empresa]
+
+    # Armazenar o DataFrame no dicionário
+    dfs_por_empresa[empresa] = df_filtrado
+
+# Exemplo: Acessando o DataFrame filtrado para uma empresa específica
+
+for empresa, df_filtrado in dfs_por_empresa.items():
+    nome_arquivo = f"{empresa}".replace(" ", "_")
+    nome_arquivo = nome_arquivo.replace("/", "_")
+
+
+    caminho = f'/content/drive/MyDrive/SIGFIS/{nome_arquivo}.xlsx'
+
+
+
+
+      # Substituir espaços no nome do arquivo
+    df_filtrado.to_excel(caminho, nome_arquivo, index=False)
+
+
+
+"""# Big Query"""
+
+!pip install gspread google-auth google-cloud-bigquery pandas
+
+SERVICE_ACCOUNT_FILE = "/content/credenciais.json"
+
+import gspread
+from google.oauth2.service_account import Credentials
+from google.cloud import bigquery
+import pandas as pd
+
+# 1. Configurar credenciais e inicializar APIs
+SERVICE_ACCOUNT_FILE = "/content/credenciais.json"
+
+# Autenticar Google Sheets
+scopes = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+credentials = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
+gc = gspread.authorize(credentials)
+
+# Autenticar BigQuery
+bq_client = bigquery.Client.from_service_account_json(SERVICE_ACCOUNT_FILE)
+
+# 2. Ler dados do Google Sheets
+SHEET_ID = "15Nvdi3yh0dOELm7XLBYIvRAuNaC1ufcpPpb5dH6zuhQ"  # Substitua pelo ID da sua planilha
+SHEET_NAME = "Big Query"  # Nome da aba no Google Sheets
+
+# Acessar a planilha
+sheet = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
+
+# Obter todos os valores como lista de listas
+data = sheet.get_all_values()
+
+# Converter para DataFrame (usando a primeira linha como cabeçalho)
+headers = data[0]
+rows = data[1:]
+df = pd.DataFrame(rows, columns=headers)
+
+# 3. Enviar dados para o BigQuery
+PROJECT_ID = "seu-projeto-id"
+DATASET_ID = "seu-dataset"
+TABLE_ID = "sua-tabela"
+
+# Configurar destino da tabela no BigQuery
+table_id = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
+
+# Escrever no BigQuery
+job_config = bigquery.LoadJobConfig(
+    write_disposition="WRITE_TRUNCATE",  # Sobrescrever a tabela
+)
+
+job = bq_client.load_table_from_dataframe(df, table_id, job_config=job_config)
+
+# Esperar até que o job seja concluído
+job.result()
+
+print(f"Dados enviados com sucesso para {table_id}.")
+
+import pandas as pd
+
+# Especificar a planilha
+PG = pd.read_excel("PG-2024.xlsx", sheet_name="PG")
+EMP = pd.read_excel("PG-2024.xlsx", sheet_name="EMP")
+
+PG = pd.DataFrame(PG)
+EMP = pd.DataFrame(EMP)
+
+
+
+EMP.head()
+
+from google.colab import sheets
+sheet = sheets.InteractiveSheet(df=EMP)
+
+PG.head()
+
+"""# ALUGUEL"""
+
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt, RGBColor, Inches
+from docx.oxml.ns import qn
+from datetime import datetime
+import time
+import pandas as pd
+from num2words import num2words
+pd.set_option('display.max_colwidth', None)
+import random
+from docx import Document
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+import os
+from datetime import datetime, timedelta
+
+start_time = time.time()
+
+# LISTA DE PROCESSOS PARA os alugúeis
+alugueis = gc.open('Base de Dados - FMS').worksheet('Aluguéis').get_all_records()
+
+# DATA FRAMES
+alugueis = pd.DataFrame(alugueis)
+doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
+
+for index, row in alugueis.iterrows():
+  processo = str(row["PROCESSO"])
+  if processo == "":
+    break
+  else:
+
+    # Data atual
+
+    dia = str(datetime.now().strftime("%d"))
+    data_atual = datetime.now()
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    nome_ano = str(datetime.now().year)
+    nome_mes = meses[data_atual.month - 1]
+
+    valor = row["VALOR"]
+    valor_numerico = valor.replace(",", ".").replace(".","")
+    valor_numerico = valor_numerico.replace("$","")
+    valor_numerico = int(valor_numerico)
+    valor_numerico = valor_numerico / 100
+
+
+    def valor_monetario_por_extenso(valor_numerico):
+
+        # Separar a parte inteira e decimal do valor
+        reais, centavos = divmod(valor_numerico, 1)
+        centavos = round(centavos * 100)
+
+        # Converter a parte inteira para extenso
+        reais = num2words(reais, lang='pt_BR')
+
+        # Converter a parte decimal para extenso
+        centavos = num2words(centavos, lang='pt_BR')
+
+        if centavos == 'zero':
+          extenso_final = f'{reais} reais'
+        else: # Assign a value to extenso_final when centavos is not zero
+          extenso_final = f'{reais} reais e {centavos} centavos'
+
+        return extenso_final
+
+    valor2 = valor.replace("$", "R$ ")
+
+
+    valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
+    valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
+
+  # Informaões
+    status = row["STATUS"]
+    interessado = row["INTERESSADO"]
+    nome = row["NOME"]
+    unidade = row["UNIDADE"]
+    endereco = row["ENDEREÇO CONCATENADO"]
+    documentos = row["DOCUMENTOS"]
+
+    #periodo
+    meses_anteriores = data_atual.month - 1 if data_atual.month > 1 else 12
+    ano = str(data_atual.year - 1) if data_atual.month == 1 else str(data_atual.year)
+    mes = meses[meses_anteriores - 1]
+    periodo = f'{mes}/{ano}'
+
+    if ano == nome_ano:
+      termo = 'TERMO DE AJUSTE DE CONTAS'
+    else:
+      termo = 'TERMO DE RECONHECIMENTO DE DÍVIDAS'
+
+    if status == 'INATIVO':
+      continue
+    else:
+      # TERMO
+
+      if documentos == "TERMO E AUTORIZO":
+
+        num_processo = doc.add_paragraph()
+        num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        paragraph_format = num_processo.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+        paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = num_processo.add_run('FL.______: ')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
+
+
+        paragrafo1 = num_processo.add_run('  Rubrica:________')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
+
+
+        paragrafo = doc.add_paragraph('\n')
+        paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph_format = paragrafo.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+        paragrafo1 = paragrafo.add_run(termo)
+        paragrafo1.font.color.rgb = RGBColor(0, 0, 0)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+
+        paragrafo = doc.add_paragraph('\n')
+        paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        paragraph_format = paragrafo.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+        paragrafo1 = paragrafo.add_run('             Fica reconhecida a dívida referente ao ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run('Termo de Contrato de Locação de Imóvel situado à ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(endereco)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(f', no período de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(periodo)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(', perfazendo o valor total de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(valor2)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        if '/' in interessado:
+          paragrafo1 = paragrafo.add_run(', cujos proprietários são os Srs. ')
+          paragrafo1.font.size = Pt(fonte_padrão)
+          paragrafo1.font.name = 'Arial'
+        else:
+          paragrafo1 = paragrafo.add_run(', cujo proprietário é o Sr. ')
+          paragrafo1.font.size = Pt(fonte_padrão)
+          paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(f'{nome}.')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        # Cidade e Data
+
+        cd = doc.add_paragraph()
+        cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        cd1 = cd.add_run('\nDuque de Caxias, ')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(dia)
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(' de ')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(nome_mes)
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(' de ')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(nome_ano)
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run('.')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+
+
+      # Secretaria
+        assinatura = doc.add_paragraph()
+        assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph_format = assinatura.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+        assinatura1 = assinatura.add_run("\n\n\nCÉLIA SERRANO DA SILVA ")
+        assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+        assinatura1.bold = True
+        assinatura1.font.size = Pt(12)
+        assinatura1.font.name = 'Arial'
+
+        assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+        assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+        assinaturasec.font.size = Pt(12)
+        assinaturasec.font.name = 'Arial'
+
+        assinaturasec = assinatura.add_run("\nMat. 23098-0")
+        assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+        assinaturasec.font.size = Pt(12)
+        assinaturasec.font.name = 'Arial'
+
+
+
+      # QUEBRA
+        doc.add_page_break()
+
+
+      # AUTORIZO
+
+
+        num_processo = doc.add_paragraph('\n')
+        num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        paragraph_format = num_processo.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+        paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = num_processo.add_run('FL.:______')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
+
+
+        paragrafo1 = num_processo.add_run('  Rubrica:________')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
+
+
+        paragrafo = doc.add_paragraph('\n\n')
+        paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph_format = paragrafo.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+        paragrafo1 = paragrafo.add_run('              Nos termos do Decreto 8.641, de 02 de janeiro de 2024, ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run('AUTORIZO')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(' o Pagamento do presente processo administrativo no valor de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(valor2)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(f', referente ao Termo de Contrato de Locação de Imóvel situado à ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(endereco)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(f', no período de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(periodo)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        if '/' in interessado:
+          paragrafo1 = paragrafo.add_run(', cujos proprietários são os Srs. ')
+          paragrafo1.font.size = Pt(fonte_padrão)
+          paragrafo1.font.name = 'Arial'
+        else:
+          paragrafo1 = paragrafo.add_run(', cujo proprietário é o Sr. ')
+          paragrafo1.font.size = Pt(fonte_padrão)
+          paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(f'{nome}.')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run('\n\n	   O exame da documentação associada ao presente pleito, nos termos do decreto supracitado, no âmbito das responsabilidades desta Secretaria Municipal de Saúde, foi considerado ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run('SEM RESSALVAS.')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        fiscais = row['FISCAL NOTA']
+        paragrafox = doc.add_paragraph()
+        paragrafox.paragraph_format.left_indent = Inches(1.5)
+        paragrafox.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+        paragrafo1 = paragrafox.add_run(f'1. Relatório Fiscal atestado por: ')
+        paragrafo1.font.size = Pt(11)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+        paragrafo1.font.size = Pt(11)
+        paragrafo1.bold = True
+        paragrafo1.font.name = 'Arial'
+
+
+        paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        paragraph_format = paragrafo.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+      # Cidade e Data
+
+        cd = doc.add_paragraph()
+        cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        cd1 = cd.add_run('\nDuque de Caxias, ')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(dia)
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(' de ')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(nome_mes)
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(' de ')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(nome_ano)
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run('.')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+
+
+      # Secretaria
+        assinatura = doc.add_paragraph()
+        assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph_format = assinatura.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+        assinatura1 = assinatura.add_run("\n\n\nCÉLIA SERRANO DA SILVA")
+        assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+        assinatura1.bold = True
+        assinatura1.font.size = Pt(fonte_padrão)
+        assinatura1.font.name = 'Arial'
+
+        assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+        assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+        assinaturasec.font.size = Pt(fonte_padrão)
+        assinaturasec.font.name = 'Arial'
+
+        assinaturasec = assinatura.add_run("\nMat. 23098-0")
+        assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+        assinaturasec.font.size = Pt(fonte_padrão)
+        assinaturasec.font.name = 'Arial'
+
+
+
+
+        # QUEBRA
+        doc.add_page_break()
+
+          # Nome do arquivo
+
+        nome_arquivo = processo.replace('/','.')
+
+        end_time = time.time()
+
+      else:
+        # AUTORIZO
+
+
+        num_processo = doc.add_paragraph('\n')
+        num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        paragraph_format = num_processo.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+        paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = num_processo.add_run('FL.:______')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
+
+
+        paragrafo1 = num_processo.add_run('  Rubrica:________')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
+
+
+        paragrafo = doc.add_paragraph('\n\n')
+        paragrafo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph_format = paragrafo.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+        paragrafo1 = paragrafo.add_run('              Nos termos do Decreto 8.641, de 02 de janeiro de 2024, ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run('AUTORIZO')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(' o Pagamento do presente processo administrativo no valor de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(valor2)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(valor_monetario_por_extenso)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(f', referente ao Termo de Contrato de Locação de Imóvel situado à ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(endereco)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(f', no período de ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(periodo)
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        if '/' in interessado:
+          paragrafo1 = paragrafo.add_run(', cujos proprietários são os Srs. ')
+          paragrafo1.font.size = Pt(fonte_padrão)
+          paragrafo1.font.name = 'Arial'
+        else:
+          paragrafo1 = paragrafo.add_run(', cujo proprietário é o Sr. ')
+          paragrafo1.font.size = Pt(fonte_padrão)
+          paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run(f'{nome}.')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run('\n\n	   O exame da documentação associada ao presente pleito, nos termos do decreto supracitado, no âmbito das responsabilidades desta Secretaria Municipal de Saúde, foi considerado ')
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafo.add_run('SEM RESSALVAS.')
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_padrão)
+        paragrafo1.font.name = 'Arial'
+
+        fiscais = row['FISCAL NOTA']
+        paragrafox = doc.add_paragraph()
+        paragrafox.paragraph_format.left_indent = Inches(1.5)
+        paragrafox.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+        paragrafo1 = paragrafox.add_run(f'1. Relatório Fiscal atestado por: ')
+        paragrafo1.font.size = Pt(11)
+        paragrafo1.font.name = 'Arial'
+
+        paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+        paragrafo1.font.size = Pt(11)
+        paragrafo1.bold = True
+        paragrafo1.font.name = 'Arial'
+
+
+        paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        paragraph_format = paragrafo.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+      # Cidade e Data
+
+        cd = doc.add_paragraph()
+        cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        cd1 = cd.add_run('\nDuque de Caxias, ')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(dia)
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(' de ')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(nome_mes)
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(' de ')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run(nome_ano)
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+        cd1 = cd.add_run('.')
+        cd1.font.size = Pt(fonte_padrão)
+        cd1.font.name = 'Arial'
+
+
+      # Secretaria
+        assinatura = doc.add_paragraph()
+        assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph_format = assinatura.paragraph_format
+        paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+        assinatura1 = assinatura.add_run("\n\n\nCÉLIA SERRANO DA SILVA")
+        assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+        assinatura1.bold = True
+        assinatura1.font.size = Pt(fonte_padrão)
+        assinatura1.font.name = 'Arial'
+
+        assinaturasec = assinatura.add_run("\nSecretária Municipal de Saúde")
+        assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+        assinaturasec.font.size = Pt(fonte_padrão)
+        assinaturasec.font.name = 'Arial'
+
+        assinaturasec = assinatura.add_run("\nMat. 23098-0")
+        assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+        assinaturasec.font.size = Pt(fonte_padrão)
+        assinaturasec.font.name = 'Arial'
+
+
+        # QUEBRA
+        doc.add_page_break()
+
+          # Nome do arquivo
+
+        nome_arquivo = processo.replace('/','.')
+
+        end_time = time.time()
+
+
+
+
+        # Salvamento
+        caminho = f'/content/drive/MyDrive/ALUGUÉIS/{mes}'
+
+
+        doc.save(caminho)
+        print(f"Autorizo para processo nº {processo} gerado com sucesso!")
+
+# Despacho
+doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
+for index, row in alugueis.iterrows():
+  processo = str(row["PROCESSO"])
+  if processo == "":
+    break
+  else:
+    num_processo = doc.add_paragraph('\n\n')
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('FL.:_______ ')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('  Rubrica:________')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.name = 'Arial'
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo = num_processo.add_run('\nDESPACHO')
+    paragrafo.font.underline = True
+    paragrafo.bold = True
+    paragrafo.font.size = Pt(fonte_padrão)
+    paragrafo.font.name = 'Arial'
+
+    num_processo = doc.add_paragraph()
+    num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph_format = num_processo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    paragrafo = doc.add_paragraph()
+    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph_format = paragrafo.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+    paragrafo1 = paragrafo.add_run('        Considerando a realização da devida instrução processual, nos termos do Decreto Municipal nº 8.641/2024, encaminho o presente processo de pagamento para classificação orçamentária.')
+    paragrafo1.font.size = Pt(fonte_padrão)
+    paragrafo1.font.name = 'Arial'
+
+
+
+    # Cidade e Data
+
+    cd = doc.add_paragraph()
+    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(dia)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_mes)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(' de ')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run(nome_ano)
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+    cd1 = cd.add_run('.')
+    cd1.font.size = Pt(fonte_padrão)
+    cd1.font.name = 'Arial'
+
+    atenc = doc.add_paragraph()
+    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    formatação = atenc.paragraph_format
+    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    # Secretaria
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run(f"\n\nMarlon Lopes")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(fonte_padrão)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run(f"\nAssistente Operacional")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run(f"\nMat. 47.643-9")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+
+    atenc = doc.add_paragraph()
+    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    formatação = atenc.paragraph_format
+    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+
+    # Revisão
+    assinatura = doc.add_paragraph()
+    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph_format = assinatura.paragraph_format
+    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+    assinatura1 = assinatura.add_run("\n\nCarolina Bandeira")
+    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+    assinatura1.bold = True
+    assinatura1.font.size = Pt(fonte_padrão)
+    assinatura1.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nCoordenadora de Instrução Processual")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    assinaturasec = assinatura.add_run("\nMat. 43.385-3")
+    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+    assinaturasec.font.size = Pt(fonte_padrão)
+    assinaturasec.font.name = 'Arial'
+
+    doc.add_page_break()
+
+  # Nome do arquivo
+
+    nome_arquivo = processo.replace('/','.')
+
+    end_time = time.time()
+
+
+
+    # Salvamento
+    caminho = f'/content/drive/MyDrive/ALUGUÉIS/Despacho - {mes}'
+
+
+    doc.save(caminho)
+    print(f"despacho - {mes} gerado com sucesso!")
+
+
+
+execution_time = end_time - start_time
+print(f"Tempo de execução: {execution_time:.1f} segundos")
+
+from datetime import datetime
+
+# Obter a data atual
+data_atual = datetime.now()
+
+# Calcular o mês anterior
+if data_atual.month == 1:
+    mes_anterior = 12  # Dezembro do ano anterior
+else:
+    mes_anterior = data_atual.month - 1
+
+# Imprimir o mês anterior
+print(mes_anterior)
