@@ -1173,6 +1173,8 @@ base_empresas = [
 sms = "atendimento às necessidades da Secretaria Municipal de Saúde"
 
 for index, row in instruir.iterrows():
+  certidão = row['CERTIDÃO']
+  fl_certidao = row['FL CERTIDÃO']
   doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
   if row['PROCESSO'] == "":
     break
@@ -1864,148 +1866,294 @@ for index, row in instruir.iterrows():
       cargo = 'Assistente Operacional'
       mat = 'Mat. 46.988-2'
 
-    num_processo = doc.add_paragraph('\n\n')
-    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    paragraph_format = num_processo.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
 
-    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
-    paragrafo1.bold = True
-    paragrafo1.font.size = Pt(10)
-    paragrafo1.font.name = 'Arial'
+    if certidão == "IRREGULAR":
+      num_processo = doc.add_paragraph('\n\n')
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
 
-    paragrafo1 = num_processo.add_run('FL.: ')
-    paragrafo1.bold = True
-    paragrafo1.font.size = Pt(10)
-    paragrafo1.font.name = 'Arial'
+      paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
 
-    paragrafo1 = num_processo.add_run(f'    {num_pag_despacho}    ')
-    paragrafo1.bold = True
-    paragrafo1.underline = True
-    paragrafo1.font.size = Pt(10)
-    paragrafo1.font.name = 'Arial'
+      paragrafo1 = num_processo.add_run('FL.: ')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
 
-    paragrafo1 = num_processo.add_run('  Rubrica:________')
-    paragrafo1.bold = True
-    paragrafo1.font.size = Pt(10)
-    paragrafo1.font.name = 'Arial'
+      paragrafo1 = num_processo.add_run(f'    {num_pag_despacho}    ')
+      paragrafo1.bold = True
+      paragrafo1.underline = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
 
-    num_processo = doc.add_paragraph()
-    num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    paragraph_format = num_processo.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+      paragrafo1 = num_processo.add_run('  Rubrica:________')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
 
-    paragrafo = num_processo.add_run('\nDESPACHO')
-    paragrafo.font.underline = True
-    paragrafo.bold = True
-    paragrafo.font.size = Pt(fonte_padrão)
-    paragrafo.font.name = 'Arial'
+      num_processo = doc.add_paragraph()
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-    num_processo = doc.add_paragraph()
-    num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    paragraph_format = num_processo.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+      paragrafo = num_processo.add_run('\nDESPACHO')
+      paragrafo.font.underline = True
+      paragrafo.bold = True
+      paragrafo.font.size = Pt(fonte_padrão)
+      paragrafo.font.name = 'Arial'
 
-    paragrafo = num_processo.add_run(f'\nÀ Procuradoria Geral do Município.\n')
-    paragrafo.font.size = Pt(fonte_padrão)
-    paragrafo.font.name = 'Arial'
+      num_processo = doc.add_paragraph()
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-    paragrafo = doc.add_paragraph()
-    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    paragraph_format = paragrafo.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+      paragrafo = num_processo.add_run(f'\nÀ Procuradoria Geral do Município.\n')
+      paragrafo.font.size = Pt(fonte_padrão)
+      paragrafo.font.name = 'Arial'
 
-    paragrafo1 = paragrafo.add_run('        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento através de Ajuste de Contas/Reconhecimento de Dívida, com base nos documentos encartados aos autos.')
-    paragrafo1.font.size = Pt(fonte_padrão)
-    paragrafo1.font.name = 'Arial'
+      paragrafo = doc.add_paragraph()
+      paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+      paragraph_format = paragrafo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-
-
-  # Cidade e Data
-
-    cd = doc.add_paragraph()
-    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(dia)
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(' de ')
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(nome_mes)
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(' de ')
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(ano)
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run('.')
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-
-    atenc = doc.add_paragraph()
-    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    formatação = atenc.paragraph_format
-    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-
-    # Secretaria
-    assinatura = doc.add_paragraph()
-    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    paragraph_format = assinatura.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-
-    assinatura1 = assinatura.add_run(f"\n\n{instrutor}")
-    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-    assinatura1.bold = True
-    assinatura1.font.size = Pt(fonte_padrão)
-    assinatura1.font.name = 'Arial'
-
-    assinaturasec = assinatura.add_run(f"\n{cargo}")
-    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-    assinaturasec.font.size = Pt(fonte_padrão)
-    assinaturasec.font.name = 'Arial'
-
-    assinaturasec = assinatura.add_run(f"\n{mat}")
-    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-    assinaturasec.font.size = Pt(fonte_padrão)
-    assinaturasec.font.name = 'Arial'
-
-
-    atenc = doc.add_paragraph()
-    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    formatação = atenc.paragraph_format
-    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+      paragrafo1 = paragrafo.add_run(f'        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento com CND irregular (fl. {fl_certidao}), com base nos documentos encartados aos autos.')
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
 
 
 
-    # Revisão
-    assinatura = doc.add_paragraph()
-    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    paragraph_format = assinatura.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    # Cidade e Data
+
+      cd = doc.add_paragraph()
+      cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+      cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(dia)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(' de ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(nome_mes)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(' de ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(ano)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run('.')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+
+      atenc = doc.add_paragraph()
+      atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      formatação = atenc.paragraph_format
+      formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
 
-    assinatura1 = assinatura.add_run("\n\nMayra de Souza Pimentel")
-    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-    assinatura1.bold = True
-    assinatura1.font.size = Pt(fonte_padrão)
-    assinatura1.font.name = 'Arial'
+      # Secretaria
+      assinatura = doc.add_paragraph()
+      assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = assinatura.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-    assinaturasec = assinatura.add_run("\nDiretora de Instrução Processual")
-    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-    assinaturasec.font.size = Pt(fonte_padrão)
-    assinaturasec.font.name = 'Arial'
 
-    assinaturasec = assinatura.add_run("\nMat. 41.551-0")
-    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-    assinaturasec.font.size = Pt(fonte_padrão)
-    assinaturasec.font.name = 'Arial'
+      assinatura1 = assinatura.add_run(f"\n\n{instrutor}")
+      assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+      assinatura1.bold = True
+      assinatura1.font.size = Pt(fonte_padrão)
+      assinatura1.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run(f"\n{cargo}")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run(f"\n{mat}")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+
+      atenc = doc.add_paragraph()
+      atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      formatação = atenc.paragraph_format
+      formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+
+      # Revisão
+      assinatura = doc.add_paragraph()
+      assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = assinatura.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+      assinatura1 = assinatura.add_run("\n\nMayra de Souza Pimentel")
+      assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+      assinatura1.bold = True
+      assinatura1.font.size = Pt(fonte_padrão)
+      assinatura1.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run("\nDiretora de Instrução Processual")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run("\nMat. 41.551-0")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+    else:
+      num_processo = doc.add_paragraph('\n\n')
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+      paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
+
+      paragrafo1 = num_processo.add_run('FL.: ')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
+
+      paragrafo1 = num_processo.add_run(f'    {num_pag_despacho}    ')
+      paragrafo1.bold = True
+      paragrafo1.underline = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
+
+      paragrafo1 = num_processo.add_run('  Rubrica:________')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
+
+      num_processo = doc.add_paragraph()
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+      paragrafo = num_processo.add_run('\nDESPACHO')
+      paragrafo.font.underline = True
+      paragrafo.bold = True
+      paragrafo.font.size = Pt(fonte_padrão)
+      paragrafo.font.name = 'Arial'
+
+      num_processo = doc.add_paragraph()
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+      paragrafo = num_processo.add_run(f'\nÀ Procuradoria Geral do Município.\n')
+      paragrafo.font.size = Pt(fonte_padrão)
+      paragrafo.font.name = 'Arial'
+
+      paragrafo = doc.add_paragraph()
+      paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+      paragraph_format = paragrafo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+      paragrafo1 = paragrafo.add_run('        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento através de Ajuste de Contas/Reconhecimento de Dívida, com base nos documentos encartados aos autos.')
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+
+
+
+    # Cidade e Data
+
+      cd = doc.add_paragraph()
+      cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+      cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(dia)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(' de ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(nome_mes)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(' de ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(ano)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run('.')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+
+      atenc = doc.add_paragraph()
+      atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      formatação = atenc.paragraph_format
+      formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+      # Secretaria
+      assinatura = doc.add_paragraph()
+      assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = assinatura.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+      assinatura1 = assinatura.add_run(f"\n\n{instrutor}")
+      assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+      assinatura1.bold = True
+      assinatura1.font.size = Pt(fonte_padrão)
+      assinatura1.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run(f"\n{cargo}")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run(f"\n{mat}")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+
+      atenc = doc.add_paragraph()
+      atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      formatação = atenc.paragraph_format
+      formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+
+      # Revisão
+      assinatura = doc.add_paragraph()
+      assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = assinatura.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+      assinatura1 = assinatura.add_run("\n\nMayra de Souza Pimentel")
+      assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+      assinatura1.bold = True
+      assinatura1.font.size = Pt(fonte_padrão)
+      assinatura1.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run("\nDiretora de Instrução Processual")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run("\nMat. 41.551-0")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
 
 
   # Nome do arquivo
