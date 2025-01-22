@@ -117,7 +117,10 @@ for index, row in tabela.iterrows():
   # Informaões do Termo
 
     folha = row['Folha']
-    folha = folha + 1
+    if folha == '':
+      folha = ''
+    else:
+      folha = folha + 1
     processo = row["Processo"]
     n_termo = str(row['Nº Termo'])
     ano_termo = str(row['Ano'])
@@ -353,7 +356,10 @@ for index, row in tabela.iterrows():
 
 
   # Segunda Página
-    folha = folha + 1
+    if folha == '':
+      folha = ''
+    else:
+      folha = folha + 1
     paragrafo_inicial = doc.add_paragraph('')
     paragrafo1 = paragrafo_inicial.add_run(f'\nProcesso n° {processo} FL {folha}')
     paragrafo1.bold = True
@@ -518,7 +524,10 @@ for index, row in tabela.iterrows():
 
   # Terceira Página
 
-    folha = folha + 1
+    if folha == '':
+      folha = ''
+    else:
+      folha = folha + 1
     paragrafo_inicial = doc.add_paragraph('')
     paragrafo1 = paragrafo_inicial.add_run(f'\nProcesso n° {processo} FL {folha}')
     paragrafo1.bold = True
@@ -680,7 +689,10 @@ for index, row in tabela.iterrows():
 
   # Quarta Página
 
-    folha = folha + 1
+    if folha == '':
+      folha = ''
+    else:
+      folha = folha + 1
     paragrafo_inicial = doc.add_paragraph('')
     paragrafo1 = paragrafo_inicial.add_run(f'\nProcesso n° {processo} FL {folha}')
     paragrafo1.bold = True
@@ -988,8 +1000,10 @@ for index, row in tabela.iterrows():
       instrutor = 'Letícia Pimenta'
       cargo = 'Assistente Operacional'
       mat = 'Mat. 46.988-2'
-    folha = row["Folha"]
-    folha = folha + 6
+    if folha == '':
+      folha = ''
+    else:
+      folha = folha + 6
     num_processo = doc.add_paragraph('\n\n')
     num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     paragraph_format = num_processo.paragraph_format
@@ -1140,8 +1154,10 @@ from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import os
+import shutil
 
 start_time = time.time()
+lista_processos = []
 
 # LISTA DE PROCESSOS PARA INSTRUÇÃO
 instruir = gc.open('Dados TAC').worksheet('Instruir').get_all_records()
@@ -1172,9 +1188,11 @@ base_empresas = [
 #unidade a ser colocada
 sms = "atendimento às necessidades da Secretaria Municipal de Saúde"
 
+#caminho para salvar todos os processos em apenas um documento
+proc_impress = f'/content/drive/MyDrive/TERMOS E AUTORIZOS/PROCESSOS PARA IMPRESSÃO.docx'
+
 for index, row in instruir.iterrows():
   certidão = row['CERTIDÃO']
-  fl_certidao = row['FL CERTIDÃO']
   doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
   if row['PROCESSO'] == "":
     break
@@ -1262,31 +1280,37 @@ for index, row in instruir.iterrows():
 
     valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
     valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
+    #python reconhece o número 14 como "Catorze" no valor monetário por extenso
+    #para resolver esse problema:
     if "14" in valor2:
       valor_monetario_por_extenso = valor_monetario_por_extenso.replace("catorze", "quatorze")
 
 
   # Notas Fiscais
     if processo[-4:] == "2025":
-      expected_headers = ['PROCESSO', 'NOTAS', 'EMISSÃO','REFERÊNCIA']
-      notas = gc.open('Dados TAC').worksheet('Notas 2025').get_all_records(expected_headers=expected_headers)
-      notas = pd.DataFrame(notas)
+      # Obter todos os dados da planilha como strings usando get_all_values()
+      notas = gc.open('Dados TAC').worksheet('Notas 2025').get_all_values()
+      notas = pd.DataFrame(notas[1:], columns=notas[0])
+      notas['NOTAS'] = notas['NOTAS'].astype(str)
     else:
-      expected_headers = ['PROCESSO', 'NOTAS', 'EMISSÃO','REFERÊNCIA']
-      notas = gc.open('Dados TAC').worksheet('Notas 2024').get_all_records(expected_headers=expected_headers)
-      notas = pd.DataFrame(notas)
-
+      notas = gc.open('Dados TAC').worksheet('Notas 2024').get_all_values()
+      notas = pd.DataFrame(notas[1:], columns=notas[0])
+      notas['NOTAS'] = notas['NOTAS'].astype(str)
 
     processo = row['PROCESSO']
     notas_processo = notas[notas['PROCESSO'] == processo]
 
     agrupados = notas.groupby('PROCESSO')['NOTAS'].apply(lambda x: ', '.join(map(str, x))).reset_index()
     lista_notas = agrupados.loc[agrupados['PROCESSO'] == processo, 'NOTAS'].to_string(index = False)
+    lista_notas = str(lista_notas)
 
 
     tipo = row['DOC']
     notas_filtradas = notas[notas['PROCESSO'] == processo]
-    qtd_notas = len(notas_filtradas)
+    nota_filtrada = notas_filtradas['DOC']
+    notas_filtradas = str(notas_filtradas)
+    print(nota_filtrada)
+    qtd_notas = len(nota_filtrada)
 
 
     if tipo == 'DNF' and qtd_notas > 1:
@@ -1352,6 +1376,18 @@ for index, row in instruir.iterrows():
     cnpj = row["CNPJ"]
     periodo_inicial = row["PERÍODO INICIAL"]
     periodo_final = row["PERÍODO FINAL"]
+    #para verificar se o documento é termo de ajustes de contas ou termo de reconhecimento de divídas
+    ano_atual = str(datetime.now().year)
+
+    ano_referencia = periodo_inicial.split('/')
+    ano_referencia = str(ano_referencia[-1])
+
+    if ano_referencia == ano_atual:
+      termo = 'TERMO DE AJUSTE DE CONTAS'
+
+    else:
+      termo = 'TERMO DE RECONHECIMENTO DE DÍVIDA'
+
     if periodo_inicial == periodo_final:
       periodo = periodo_inicial
     else:
@@ -1384,17 +1420,6 @@ for index, row in instruir.iterrows():
                 pass
           else:
             pass
-
-    ano_atual = str(datetime.now().year)
-
-    ano_referencia = periodo.split('/')
-    ano_referencia = str(ano_referencia[-1])
-
-    if ano_referencia == ano_atual:
-      termo = 'TERMO DE AJUSTE DE CONTAS'
-
-    else:
-      termo = 'TERMO DE RECONHECIMENTO DE DÍVIDA'
 
 
   # Preposição depois de 'emitida' (em/de)
@@ -1868,6 +1893,7 @@ for index, row in instruir.iterrows():
 
 
     if certidão == "IRREGULAR":
+      folha = folha + 1
       num_processo = doc.add_paragraph('\n\n')
       num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
       paragraph_format = num_processo.paragraph_format
@@ -1919,7 +1945,7 @@ for index, row in instruir.iterrows():
       paragraph_format = paragrafo.paragraph_format
       paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-      paragrafo1 = paragrafo.add_run(f'        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento com CND irregular (fl. {fl_certidao}), com base nos documentos encartados aos autos.')
+      paragrafo1 = paragrafo.add_run(f'        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento com CND irregular (fl. {folha}), com base nos documentos encartados aos autos.')
       paragrafo1.font.size = Pt(fonte_padrão)
       paragrafo1.font.name = 'Arial'
 
@@ -2010,6 +2036,9 @@ for index, row in instruir.iterrows():
       assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
       assinaturasec.font.size = Pt(fonte_padrão)
       assinaturasec.font.name = 'Arial'
+
+      # QUEBRA
+      doc.add_page_break()
 
     else:
       num_processo = doc.add_paragraph('\n\n')
@@ -2155,26 +2184,37 @@ for index, row in instruir.iterrows():
       assinaturasec.font.size = Pt(fonte_padrão)
       assinaturasec.font.name = 'Arial'
 
+      # QUEBRA
+      doc.add_page_break()
 
   # Nome do arquivo
-
-    nome_arquivo = processo.replace('/','.')
+    processo_format = processo.replace('/','.')
 
     end_time = time.time()
 
-
-
     # Salvamento
     caminho = f'/content/drive/MyDrive/TERMOS E AUTORIZOS/{ano}/{empresa}'
+    caminho_format = f'{caminho}/{processo_format}.docx'
+    lista_processos.append(caminho_format)
+    caminho_copia = f'/content/drive/MyDrive/TERMOS E AUTORIZOS/PROCESSOS PARA IMPRESSÃO.docx'
 
     if os.path.exists(caminho):
       pass
     else:
       os.makedirs(caminho)
 
-    doc.save(f'{caminho}/{nome_arquivo}.docx')
+    doc.save(caminho_format)
     print(f"Autorizo para processo nº {processo} gerado com sucesso!")
 
+doc_impress = Document('/content/drive/MyDrive/docx_exemplo.docx')
+
+for lista in lista_processos:
+    doc = Document(lista)
+    for element in doc.element.body:
+        doc_impress.element.body.append(element)
+
+# Salvar o documento combinado
+doc_impress.save(caminho_copia)
 
 execution_time = end_time - start_time
 print(f"Tempo de execução: {execution_time:.1f} segundos")
@@ -2857,8 +2897,10 @@ from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import os
+import shutil
 
 start_time = time.time()
+lista_processos = []
 
 # LISTA DE PROCESSOS PARA INSTRUÇÃO
 instruir = gc.open('Dados TAC').worksheet('Instruir').get_all_records()
@@ -2869,7 +2911,7 @@ base = gc.open('Base de Dados - FMS').worksheet('Objetos').get_all_records()
 instruir = pd.DataFrame(instruir)
 base = pd.DataFrame(base)
 
-#
+#base de dados para tirar a unidade
 unidades = [
  "Hospital Municipalizado Adão Pereira Nunes",
  "Hospital Municipal Dr. Moacyr Rodrigues do Carmo",
@@ -2879,9 +2921,18 @@ unidades = [
  "Departamento de Farmácia"
 ]
 
-sms = "atendimento às necessidades da Secretaria Municipal de Saúde"
+#base de empresas que não precisam tirar a unidade
+base_empresas = [
+ "TORRESMED COMÉRCIO DE EQUIPAMENTOS HOSPITALARES LTDA",
+ "KM MATERIAIS MEDICOS LTDA",
+ "MARJA COMÉRCIO E REPRESENTAÇÕES E IMPORTAÇÕES DE PRODUTOS PARA SAÚDE LTDA"
+]
 
+#unidade a ser colocada
+sms = "atendimento às necessidades da Secretaria Municipal de Saúde"
+proc_impress = f'/content/drive/MyDrive/TERMOS E AUTORIZOS/PROCESSOS PARA IMPRESSÃO.docx'
 for index, row in instruir.iterrows():
+  certidão = row['CERTIDÃO']
   doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
   if row['PROCESSO'] == "":
     break
@@ -2969,26 +3020,32 @@ for index, row in instruir.iterrows():
 
     valor_monetario_por_extenso = valor_monetario_por_extenso(valor_numerico)
     valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
+    if "14" in valor2:
+      valor_monetario_por_extenso = valor_monetario_por_extenso.replace("catorze", "quatorze")
 
 
   # Notas Fiscais
     if processo[-4:] == "2025":
-      expected_headers = ['PROCESSO', 'NOTAS', 'EMISSÃO','DOC']
-      notas = gc.open('Dados TAC').worksheet('Notas 2025').get_all_records(expected_headers=expected_headers)
-      notas = pd.DataFrame(notas)
+      # Obter todos os dados da planilha como strings usando get_all_values()
+      notas = gc.open('Dados TAC').worksheet('Notas 2025').get_all_values()
+      notas = pd.DataFrame(notas[1:], columns=notas[0])
+      notas['NOTAS'] = notas['NOTAS'].astype(str)
     else:
-      expected_headers = ['PROCESSO', 'NOTAS', 'EMISSÃO', 'REFERÊNCIA']
-      notas = gc.open('Dados TAC').worksheet('Notas 2024').get_all_records(expected_headers=expected_headers)
-      notas = pd.DataFrame(notas)
+      notas = gc.open('Dados TAC').worksheet('Notas 2024').get_all_values()
+      notas = pd.DataFrame(notas[1:], columns=notas[0])
+      notas['NOTAS'] = notas['NOTAS'].astype(str)
 
     processo = row['PROCESSO']
     notas_processo = notas[notas['PROCESSO'] == processo]
 
     agrupados = notas.groupby('PROCESSO')['NOTAS'].apply(lambda x: ', '.join(map(str, x))).reset_index()
     lista_notas = agrupados.loc[agrupados['PROCESSO'] == processo, 'NOTAS'].to_string(index = False)
+    lista_notas = str(lista_notas)
 
 
+    tipo = row['DOC']
     notas_filtradas = notas[notas['PROCESSO'] == processo]
+    notas_filtradas = str(notas_filtradas)
     qtd_notas = len(notas_filtradas)
 
 
@@ -3055,6 +3112,18 @@ for index, row in instruir.iterrows():
     cnpj = row["CNPJ"]
     periodo_inicial = row["PERÍODO INICIAL"]
     periodo_final = row["PERÍODO FINAL"]
+    #para verificar se o documento é termo de ajustes de contas ou termo de reconhecimento de divídas
+    ano_atual = str(datetime.now().year)
+
+    ano_referencia = periodo_inicial.split('/')
+    ano_referencia = str(ano_referencia[-1])
+
+    if ano_referencia == ano_atual:
+      termo = 'TERMO DE AJUSTE DE CONTAS'
+
+    else:
+      termo = 'TERMO DE RECONHECIMENTO DE DÍVIDA'
+
     if periodo_inicial == periodo_final:
       periodo = periodo_inicial
     else:
@@ -3063,27 +3132,30 @@ for index, row in instruir.iterrows():
     empresa = row["EMPRESA"]
     objeto = row["OBJETO"]
     notas_fiscais = str(lista_notas)
-    objeto_categoria = base[base['OBJETO'] == objeto]
-    categoria = objeto_categoria['CATEGORIA'].values
-    if categoria == 'MEDICAMENTOS' or categoria == 'MATERIAIS HOSPITALARES':
-      for i in unidades:
-        if str(i) in str(objeto):
-          objeto = objeto.replace(str(i), str(sms))
+
+    #laço para percorrer os itens da base de empresas
+    for i in base_empresas:
+        #para verificar se o item que está na base de empresas é igual a variável empresa
+        if str(i) == str(empresa):
+            #se o if for verdadeiro, para o laço for usando o break, fazendo com que ele pule todo bloco identado ao laço
+            break
         else:
-          continue
-    else:
-      pass
-
-    ano_atual = str(datetime.now().year)
-
-    ano_referencia = periodo.split('/')
-    ano_referencia = str(ano_referencia[-1])
-
-    if ano_referencia == ano_atual:
-      termo = 'TERMO DE AJUSTE DE CONTAS'
-
-    else:
-      termo = 'TERMO DE RECONHECIMENTO DE DÍVIDA'
+          #para filtrar apenas o objeto referido ao processo
+          objeto_categoria = base[base['OBJETO'] == objeto]
+          #para pegar a categoria do objeto
+          categoria = objeto_categoria['CATEGORIA'].values
+          #para verificar a categoria do objeto
+          if 'MEDICAMENTOS' in categoria or 'MATERIAIS HOSPITALARES' in categoria:
+            #se a categoria for "MEDICAMENTOS" ou "MATERIAIS HOSPITALARES", roda outro laço for para percorrer a lista de unidades
+            for i in unidades:
+              #para verificar se o item da lista de unidades é igual a unidade do objeto
+              if str(i) in str(objeto):
+                #se o if for verdadeiro, usa o .replace para trocar o item da lista de unidades para a unidade a ser colocada
+                objeto = objeto.replace(str(i), str(sms))
+              else:
+                pass
+          else:
+            pass
 
 
   # Preposição depois de 'emitida' (em/de)
@@ -3451,9 +3523,6 @@ for index, row in instruir.iterrows():
     else:
       num_notas = 'TIPO DE DOCUMENTO NÃO ESPECIFICADO NA PLANILHA'
 
-    paragrafox = doc.add_paragraph()
-    paragrafox.paragraph_format.left_indent = Inches(1.5)
-    paragrafox.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
 
     for index, row in notas_processo.iterrows():
@@ -3461,66 +3530,62 @@ for index, row in instruir.iterrows():
       nota = row['NOTAS']
       fiscais = row['FISCAL NOTA']
       emissao = row['EMISSÃO']
-      fiscal_unico = fiscais[0]
-      doc_unico = tipo[0]
-      if tipo == doc_unico:
-        if fiscais == fiscal_unico:
-          paragrafo1 = paragrafox.add_run(f'1. {docf} n° ')
-          paragrafo1.font.size = Pt(11)
-          paragrafo1.font.name = 'Arial'
-          for nota in notas_processo['NOTAS']:
-            paragrafo1 = paragrafox.add_run(f'{nota}')
-            paragrafo1.font.size = Pt(11)
-            paragrafo1.font.name = 'Arial'
+    paragrafox = doc.add_paragraph()
+    paragrafox.paragraph_format.left_indent = Inches(1.5)
+    paragrafox.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-          paragrafo1 = paragrafox.add_run(f' atestadas por: ')
-          paragrafo1.font.size = Pt(11)
-          paragrafo1.font.name = 'Arial'
+    doc_unica = notas_processo['DOC'].values[0]
+    docs_totais = notas_processo['DOC'].values
+    fiscal_unico = fiscais[0]
+    if n != nota_unica and fiscais != fiscal_unico:
+      for index, row in notas.iterrows():
+        processo = row['PROCESSO']
+        nota = row['NOTAS']
+        fiscais = row['FISCAL NOTA']
+        emissao = row['EMISSÃO']
+        doc = row['DOC']
 
-          paragrafo1 = paragrafox.add_run(f'{fiscais} ')
-          paragrafo1.font.size = Pt(11)
-          paragrafo1.bold = True
-          paragrafo1.font.name = 'Arial'
-        else:
-           paragrafo1 = paragrafox.add_run(f'1. {docf} n° {notas_fiscais}')
-           paragrafo1.font.size = Pt(11)
-           paragrafo1.font.name = 'Arial'
-           paragrafo1 = paragrafox.add_run(f' atestadas por: ')
-           paragrafo1.font.size = Pt(11)
-           paragrafo1.font.name = 'Arial'
-           paragrafo1 = paragrafox.add_run(f'{fiscais} ')
-           paragrafo1.font.size = Pt(11)
-           paragrafo1.bold = True
-           paragrafo1.font.name = 'Arial'
-      elif tipo != doc_unico:
-        if fiscais == fiscal_unico:
-          for d in tipo:
-            paragrafo1 = paragrafox.add_run(f'1. {docf} n° ')
-            paragrafo1.font.size = Pt(11)
-            paragrafo1.font.name = 'Arial'
-            paragrafo1 = paragrafox.add_run(f'{nota}')
-            paragrafo1.font.size = Pt(11)
-            paragrafo1.font.name = 'Arial'
-          paragrafo1 = paragrafox.add_run(f' atestadas por: ')
-          paragrafo1.font.size = Pt(11)
-          paragrafo1.font.name = 'Arial'
 
-          paragrafo1 = paragrafox.add_run(f'{fiscais} ')
-          paragrafo1.font.size = Pt(11)
-          paragrafo1.bold = True
-          paragrafo1.font.name = 'Arial'
+      paragrafo1 = paragrafox.add_run(f'1. {n} n° {notas_fiscais}')
+      paragrafo1.font.size = Pt(11)
+      paragrafo1.font.name = 'Arial'
+      paragrafo1 = paragrafox.add_run(f' atestada por: ')
+      paragrafo1.font.size = Pt(11)
+      paragrafo1.font.name = 'Arial'
 
-        else:
-          paragrafo1 = paragrafox.add_run(f'1. {docf} n° {notas_fiscais}')
-          paragrafo1.font.size = Pt(11)
-          paragrafo1.font.name = 'Arial'
-          paragrafo1 = paragrafox.add_run(f' atestadas por: ')
-          paragrafo1.font.size = Pt(11)
-          paragrafo1.font.name = 'Arial'
-          paragrafo1 = paragrafox.add_run(f'{fiscais} ')
-          paragrafo1.font.size = Pt(11)
-          paragrafo1.bold = True
-          paragrafo1.font.name = 'Arial'
+      paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+      paragrafo1.font.size = Pt(11)
+      paragrafo1.bold = True
+      paragrafo1.font.name = 'Arial'
+
+    elif n == nota_unica and fiscal_unico == fiscais:
+      paragrafo1 = paragrafox.add_run(f'1. {n} n° {notas_fiscais}')
+      paragrafo1.font.size = Pt(11)
+      paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafox.add_run(f' atestada por: ')
+    paragrafo1.font.size = Pt(11)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+    paragrafo1.font.size = Pt(11)
+    paragrafo1.bold = True
+    paragrafo1.font.name = 'Arial'
+
+    if qtd_notas > 1:
+      paragrafo1 = paragrafox.add_run(f' atestadas por: ')
+      paragrafo1.font.size = Pt(11)
+      paragrafo1.font.name = 'Arial'
+    else:
+      paragrafo1 = paragrafox.add_run(f' atestada por: ')
+      paragrafo1.font.size = Pt(11)
+      paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = paragrafox.add_run(f'{fiscais} ')
+    paragrafo1.font.size = Pt(11)
+    paragrafo1.bold = True
+    paragrafo1.font.name = 'Arial'
+
 
   # Cidade e Data
 
@@ -3596,169 +3661,330 @@ for index, row in instruir.iterrows():
       cargo = 'Assistente Operacional'
       mat = 'Mat. 46.988-2'
 
-    num_processo = doc.add_paragraph('\n\n')
-    num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    paragraph_format = num_processo.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
 
-    paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
-    paragrafo1.bold = True
-    paragrafo1.font.size = Pt(10)
-    paragrafo1.font.name = 'Arial'
+    if certidão == "IRREGULAR":
+      folha = folha + 1
+      num_processo = doc.add_paragraph('\n\n')
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
 
-    paragrafo1 = num_processo.add_run('FL.: ')
-    paragrafo1.bold = True
-    paragrafo1.font.size = Pt(10)
-    paragrafo1.font.name = 'Arial'
+      paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
 
-    paragrafo1 = num_processo.add_run(f'    {num_pag_despacho}    ')
-    paragrafo1.bold = True
-    paragrafo1.underline = True
-    paragrafo1.font.size = Pt(10)
-    paragrafo1.font.name = 'Arial'
+      paragrafo1 = num_processo.add_run('FL.: ')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
 
-    paragrafo1 = num_processo.add_run('  Rubrica:________')
-    paragrafo1.bold = True
-    paragrafo1.font.size = Pt(10)
-    paragrafo1.font.name = 'Arial'
+      paragrafo1 = num_processo.add_run(f'    {num_pag_despacho}    ')
+      paragrafo1.bold = True
+      paragrafo1.underline = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
 
-    num_processo = doc.add_paragraph()
-    num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    paragraph_format = num_processo.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+      paragrafo1 = num_processo.add_run('  Rubrica:________')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
 
-    paragrafo = num_processo.add_run('\nDESPACHO')
-    paragrafo.font.underline = True
-    paragrafo.bold = True
-    paragrafo.font.size = Pt(fonte_padrão)
-    paragrafo.font.name = 'Arial'
+      num_processo = doc.add_paragraph()
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-    num_processo = doc.add_paragraph()
-    num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    paragraph_format = num_processo.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+      paragrafo = num_processo.add_run('\nDESPACHO')
+      paragrafo.font.underline = True
+      paragrafo.bold = True
+      paragrafo.font.size = Pt(fonte_padrão)
+      paragrafo.font.name = 'Arial'
 
-    paragrafo = num_processo.add_run(f'\nÀ Procuradoria Geral do Município.\n')
-    paragrafo.font.size = Pt(fonte_padrão)
-    paragrafo.font.name = 'Arial'
+      num_processo = doc.add_paragraph()
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-    paragrafo = doc.add_paragraph()
-    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    paragraph_format = paragrafo.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+      paragrafo = num_processo.add_run(f'\nÀ Procuradoria Geral do Município.\n')
+      paragrafo.font.size = Pt(fonte_padrão)
+      paragrafo.font.name = 'Arial'
 
-    paragrafo1 = paragrafo.add_run('        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento através de Ajuste de Contas/Reconhecimento de Dívida, com base nos documentos encartados aos autos.')
-    paragrafo1.font.size = Pt(fonte_padrão)
-    paragrafo1.font.name = 'Arial'
+      paragrafo = doc.add_paragraph()
+      paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+      paragraph_format = paragrafo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-
-
-  # Cidade e Data
-
-    cd = doc.add_paragraph()
-    cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(dia)
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(' de ')
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(nome_mes)
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(' de ')
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run(ano)
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-    cd1 = cd.add_run('.')
-    cd1.font.size = Pt(fonte_padrão)
-    cd1.font.name = 'Arial'
-
-    atenc = doc.add_paragraph()
-    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    formatação = atenc.paragraph_format
-    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-
-    # Secretaria
-    assinatura = doc.add_paragraph()
-    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    paragraph_format = assinatura.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-
-
-    assinatura1 = assinatura.add_run(f"\n\n{instrutor}")
-    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-    assinatura1.bold = True
-    assinatura1.font.size = Pt(fonte_padrão)
-    assinatura1.font.name = 'Arial'
-
-    assinaturasec = assinatura.add_run(f"\n{cargo}")
-    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-    assinaturasec.font.size = Pt(fonte_padrão)
-    assinaturasec.font.name = 'Arial'
-
-    assinaturasec = assinatura.add_run(f"\n{mat}")
-    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-    assinaturasec.font.size = Pt(fonte_padrão)
-    assinaturasec.font.name = 'Arial'
-
-
-    atenc = doc.add_paragraph()
-    atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    formatação = atenc.paragraph_format
-    formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+      paragrafo1 = paragrafo.add_run(f'        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento com CND irregular (fl. {folha}), com base nos documentos encartados aos autos.')
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
 
 
 
-    # Revisão
-    assinatura = doc.add_paragraph()
-    assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    paragraph_format = assinatura.paragraph_format
-    paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    # Cidade e Data
+
+      cd = doc.add_paragraph()
+      cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+      cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(dia)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(' de ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(nome_mes)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(' de ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(ano)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run('.')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+
+      atenc = doc.add_paragraph()
+      atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      formatação = atenc.paragraph_format
+      formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
 
-    assinatura1 = assinatura.add_run("\n\nCarolina Bandeira")
-    assinatura1.font.color.rgb = RGBColor(0, 0, 0)
-    assinatura1.bold = True
-    assinatura1.font.size = Pt(fonte_padrão)
-    assinatura1.font.name = 'Arial'
+      # Secretaria
+      assinatura = doc.add_paragraph()
+      assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = assinatura.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 
-    assinaturasec = assinatura.add_run("\nCoordenadora de Instrução Processual")
-    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-    assinaturasec.font.size = Pt(fonte_padrão)
-    assinaturasec.font.name = 'Arial'
 
-    assinaturasec = assinatura.add_run("\nMat. 43.385-3")
-    assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
-    assinaturasec.font.size = Pt(fonte_padrão)
-    assinaturasec.font.name = 'Arial'
+      assinatura1 = assinatura.add_run(f"\n\n{instrutor}")
+      assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+      assinatura1.bold = True
+      assinatura1.font.size = Pt(fonte_padrão)
+      assinatura1.font.name = 'Arial'
 
+      assinaturasec = assinatura.add_run(f"\n{cargo}")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run(f"\n{mat}")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+
+      atenc = doc.add_paragraph()
+      atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      formatação = atenc.paragraph_format
+      formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+
+      # Revisão
+      assinatura = doc.add_paragraph()
+      assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = assinatura.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+      assinatura1 = assinatura.add_run("\n\nMayra de Souza Pimentel")
+      assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+      assinatura1.bold = True
+      assinatura1.font.size = Pt(fonte_padrão)
+      assinatura1.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run("\nDiretora de Instrução Processual")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run("\nMat. 41.551-0")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      # QUEBRA
+      doc.add_page_break()
+
+    else:
+      num_processo = doc.add_paragraph('\n\n')
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+      paragrafo1 = num_processo.add_run(f'Proc. Adm. n° {processo}\n')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
+
+      paragrafo1 = num_processo.add_run('FL.: ')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
+
+      paragrafo1 = num_processo.add_run(f'    {num_pag_despacho}    ')
+      paragrafo1.bold = True
+      paragrafo1.underline = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
+
+      paragrafo1 = num_processo.add_run('  Rubrica:________')
+      paragrafo1.bold = True
+      paragrafo1.font.size = Pt(10)
+      paragrafo1.font.name = 'Arial'
+
+      num_processo = doc.add_paragraph()
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+      paragrafo = num_processo.add_run('\nDESPACHO')
+      paragrafo.font.underline = True
+      paragrafo.bold = True
+      paragrafo.font.size = Pt(fonte_padrão)
+      paragrafo.font.name = 'Arial'
+
+      num_processo = doc.add_paragraph()
+      num_processo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+      paragraph_format = num_processo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+      paragrafo = num_processo.add_run(f'\nÀ Procuradoria Geral do Município.\n')
+      paragrafo.font.size = Pt(fonte_padrão)
+      paragrafo.font.name = 'Arial'
+
+      paragrafo = doc.add_paragraph()
+      paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+      paragraph_format = paragrafo.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+      paragrafo1 = paragrafo.add_run('        Encaminho o presente processo administrativo para emissão de parecer jurídico quanto à possibilidade de pagamento através de Ajuste de Contas/Reconhecimento de Dívida, com base nos documentos encartados aos autos.')
+      paragrafo1.font.size = Pt(fonte_padrão)
+      paragrafo1.font.name = 'Arial'
+
+
+
+    # Cidade e Data
+
+      cd = doc.add_paragraph()
+      cd.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+      cd1 = cd.add_run('\n\n\n\nDuque de Caxias, ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(dia)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(' de ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(nome_mes)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(' de ')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run(ano)
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+      cd1 = cd.add_run('.')
+      cd1.font.size = Pt(fonte_padrão)
+      cd1.font.name = 'Arial'
+
+      atenc = doc.add_paragraph()
+      atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      formatação = atenc.paragraph_format
+      formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+      # Secretaria
+      assinatura = doc.add_paragraph()
+      assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = assinatura.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+      assinatura1 = assinatura.add_run(f"\n\n{instrutor}")
+      assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+      assinatura1.bold = True
+      assinatura1.font.size = Pt(fonte_padrão)
+      assinatura1.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run(f"\n{cargo}")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run(f"\n{mat}")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+
+      atenc = doc.add_paragraph()
+      atenc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      formatação = atenc.paragraph_format
+      formatação.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+
+      # Revisão
+      assinatura = doc.add_paragraph()
+      assinatura.alignment = WD_ALIGN_PARAGRAPH.CENTER
+      paragraph_format = assinatura.paragraph_format
+      paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+      assinatura1 = assinatura.add_run("\n\nMayra de Souza Pimentel")
+      assinatura1.font.color.rgb = RGBColor(0, 0, 0)
+      assinatura1.bold = True
+      assinatura1.font.size = Pt(fonte_padrão)
+      assinatura1.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run("\nDiretora de Instrução Processual")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      assinaturasec = assinatura.add_run("\nMat. 41.551-0")
+      assinaturasec.font.color.rgb = RGBColor(0, 0, 0)
+      assinaturasec.font.size = Pt(fonte_padrão)
+      assinaturasec.font.name = 'Arial'
+
+      # QUEBRA
+      doc.add_page_break()
 
   # Nome do arquivo
-
-    nome_arquivo = processo.replace('/','.')
+    processo_format = processo.replace('/','.')
 
     end_time = time.time()
 
-
-
     # Salvamento
-    caminho = f'/content/drive/MyDrive/TERMOS E AUTORIZOS/{empresa}'
+    caminho = f'/content/drive/MyDrive/TERMOS E AUTORIZOS/{ano}/{empresa}'
+    caminho_format = f'{caminho}/{processo_format}.docx'
+    lista_processos.append(caminho_format)
+    caminho_copia = f'/content/drive/MyDrive/TERMOS E AUTORIZOS/PROCESSOS PARA IMPRESSÃO.docx'
 
     if os.path.exists(caminho):
       pass
     else:
       os.makedirs(caminho)
 
-    doc.save(f'{caminho}/{nome_arquivo}.docx')
+    doc.save(caminho_format)
     print(f"Autorizo para processo nº {processo} gerado com sucesso!")
 
+doc_impress = Document('/content/drive/MyDrive/docx_exemplo.docx')
+
+for lista in lista_processos:
+    doc = Document(lista)
+    for element in doc.element.body:
+        doc_impress.element.body.append(element)
+
+# Salvar o documento combinado
+doc_impress.save(caminho_copia)
 
 execution_time = end_time - start_time
 print(f"Tempo de execução: {execution_time:.1f} segundos")
@@ -4396,11 +4622,13 @@ doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
 
 for index, row in alugueis.iterrows():
   processo = str(row["PROCESSO"])
+  status = str(row["STATUS"])
+  gerar_doc = str(row["GERAR DOC"])
+  folha = row["FOLHA"]
   if processo == "":
-    break
+      continue
   else:
-
-    # Data atual
+  # Data atual
 
     dia = str(datetime.now().strftime("%d"))
     data_atual = datetime.now()
@@ -4412,8 +4640,11 @@ for index, row in alugueis.iterrows():
     valor = row["VALOR"]
     valor_numerico = valor.replace(",", ".").replace(".","")
     valor_numerico = valor_numerico.replace("$","")
-    valor_numerico = int(valor_numerico)
-    valor_numerico = valor_numerico / 100
+    if valor_numerico == "":
+      valor_numerico = 0
+    else:
+      valor_numerico = int(valor_numerico)
+      valor_numerico = valor_numerico / 100
 
 
     def valor_monetario_por_extenso(valor_numerico):
@@ -4442,13 +4673,11 @@ for index, row in alugueis.iterrows():
     valor_monetario_por_extenso = ' (' + valor_monetario_por_extenso + ')'
 
   # Informaões
-    status = row["STATUS"]
     interessado = row["INTERESSADO"]
     nome = row["NOME"]
     unidade = row["UNIDADE"]
     endereco = row["ENDEREÇO CONCATENADO"]
     documentos = row["DOCUMENTOS"]
-
     #periodo
     meses_anteriores = data_atual.month - 1 if data_atual.month > 1 else 12
     ano = str(data_atual.year - 1) if data_atual.month == 1 else str(data_atual.year)
@@ -4460,12 +4689,14 @@ for index, row in alugueis.iterrows():
     else:
       termo = 'TERMO DE RECONHECIMENTO DE DÍVIDAS'
 
-    if status == 'INATIVO':
+    if gerar_doc == '':
       continue
     else:
       # TERMO
 
       if documentos == "TERMO E AUTORIZO":
+        folha = int(folha) + 1
+        print(f'processando termo para o processo {processo}')
 
         num_processo = doc.add_paragraph()
         num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -4477,13 +4708,18 @@ for index, row in alugueis.iterrows():
         paragrafo1.font.size = Pt(fonte_proc)
         paragrafo1.font.name = 'Arial'
 
-        paragrafo1 = num_processo.add_run('FL.______: ')
+        paragrafo1 = num_processo.add_run(f'FL.:')
         paragrafo1.bold = True
         paragrafo1.font.size = Pt(fonte_proc)
         paragrafo1.font.name = 'Arial'
 
+        paragrafo1 = num_processo.add_run(f'     {folha}      ')
+        paragrafo1.underline = True
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
 
-        paragrafo1 = num_processo.add_run('  Rubrica:________')
+        paragrafo1 = num_processo.add_run('Rubrica:________')
         paragrafo1.bold = True
         paragrafo1.font.size = Pt(fonte_proc)
         paragrafo1.font.name = 'Arial'
@@ -4615,8 +4851,8 @@ for index, row in alugueis.iterrows():
 
 
       # AUTORIZO
-
-
+        folha = folha + 1
+        print(f'processando autorizo para o processo {processo}')
         num_processo = doc.add_paragraph('\n')
         num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         paragraph_format = num_processo.paragraph_format
@@ -4627,13 +4863,18 @@ for index, row in alugueis.iterrows():
         paragrafo1.font.size = Pt(fonte_proc)
         paragrafo1.font.name = 'Arial'
 
-        paragrafo1 = num_processo.add_run('FL.:______')
+        paragrafo1 = num_processo.add_run(f'FL.:')
         paragrafo1.bold = True
         paragrafo1.font.size = Pt(fonte_proc)
         paragrafo1.font.name = 'Arial'
 
+        paragrafo1 = num_processo.add_run(f'     {folha}      ')
+        paragrafo1.underline = True
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
 
-        paragrafo1 = num_processo.add_run('  Rubrica:________')
+        paragrafo1 = num_processo.add_run('Rubrica:________')
         paragrafo1.bold = True
         paragrafo1.font.size = Pt(fonte_proc)
         paragrafo1.font.name = 'Arial'
@@ -4790,9 +5031,17 @@ for index, row in alugueis.iterrows():
 
         end_time = time.time()
 
+        caminho = f'/content/drive/MyDrive/ALUGUÉIS/{mes}'
+
+
+        doc.save(caminho)
+        print(f"Termo e Autorizo para processo nº {processo} gerado com sucesso!")
+        print('--------------------------------------------------------------')
+
       else:
         # AUTORIZO
-
+        folha = folha + 1
+        print(f'processando autorizo para o processo {processo}')
 
         num_processo = doc.add_paragraph('\n')
         num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -4804,13 +5053,18 @@ for index, row in alugueis.iterrows():
         paragrafo1.font.size = Pt(fonte_proc)
         paragrafo1.font.name = 'Arial'
 
-        paragrafo1 = num_processo.add_run('FL.:______')
+        paragrafo1 = num_processo.add_run(f'FL.:')
         paragrafo1.bold = True
         paragrafo1.font.size = Pt(fonte_proc)
         paragrafo1.font.name = 'Arial'
 
+        paragrafo1 = num_processo.add_run(f'     {folha}      ')
+        paragrafo1.underline = True
+        paragrafo1.bold = True
+        paragrafo1.font.size = Pt(fonte_proc)
+        paragrafo1.font.name = 'Arial'
 
-        paragrafo1 = num_processo.add_run('  Rubrica:________')
+        paragrafo1 = num_processo.add_run('Rubrica:________')
         paragrafo1.bold = True
         paragrafo1.font.size = Pt(fonte_proc)
         paragrafo1.font.name = 'Arial'
@@ -4974,14 +5228,22 @@ for index, row in alugueis.iterrows():
 
         doc.save(caminho)
         print(f"Autorizo para processo nº {processo} gerado com sucesso!")
+        print('--------------------------------------------------------------')
 
 # Despacho
 doc = Document('/content/drive/MyDrive/docx_exemplo.docx')
 for index, row in alugueis.iterrows():
   processo = str(row["PROCESSO"])
-  if processo == "":
-    break
+  status = row["STATUS"]
+  gerar_doc = row["GERAR DOC"]
+  folha = row["FOLHA"]
+  if gerar_doc == '':
+    continue
   else:
+    if documentos == "TERMO E AUTORIZO":
+      folha = int(folha) + 3
+    else:
+      folha = int(folha) + 2
     num_processo = doc.add_paragraph('\n\n')
     num_processo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     paragraph_format = num_processo.paragraph_format
@@ -4992,14 +5254,20 @@ for index, row in alugueis.iterrows():
     paragrafo1.font.size = Pt(10)
     paragrafo1.font.name = 'Arial'
 
-    paragrafo1 = num_processo.add_run('FL.:_______ ')
+    paragrafo1 = num_processo.add_run(f'FL.:')
     paragrafo1.bold = True
     paragrafo1.font.size = Pt(10)
     paragrafo1.font.name = 'Arial'
 
-    paragrafo1 = num_processo.add_run('  Rubrica:________')
+    paragrafo1 = num_processo.add_run(f'     {folha}      ')
+    paragrafo1.underline = True
     paragrafo1.bold = True
-    paragrafo1.font.size = Pt(10)
+    paragrafo1.font.size = Pt(fonte_proc)
+    paragrafo1.font.name = 'Arial'
+
+    paragrafo1 = num_processo.add_run('Rubrica:________')
+    paragrafo1.bold = True
+    paragrafo1.font.size = Pt(fonte_proc)
     paragrafo1.font.name = 'Arial'
 
     num_processo = doc.add_paragraph()
@@ -5132,22 +5400,9 @@ for index, row in alugueis.iterrows():
 
     doc.save(caminho)
     print(f"despacho - {mes} gerado com sucesso!")
+    print('--------------------------------------------------------------')
 
 
 
 execution_time = end_time - start_time
 print(f"Tempo de execução: {execution_time:.1f} segundos")
-
-from datetime import datetime
-
-# Obter a data atual
-data_atual = datetime.now()
-
-# Calcular o mês anterior
-if data_atual.month == 1:
-    mes_anterior = 12  # Dezembro do ano anterior
-else:
-    mes_anterior = data_atual.month - 1
-
-# Imprimir o mês anterior
-print(mes_anterior)
