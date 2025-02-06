@@ -530,7 +530,8 @@ for index, row in tabela.iterrows():
           programa_trabalho = row['PROGRAMA DE TRABALHO']
           codigo_despesa = row['CÓDIGO DE DESPESA']
           fonte = row['FONTE']
-          c44 = c4.add_run(f'empenho nº {empenho}/{ano}, à Conta do Programa de Trabalho nº {programa_trabalho}, Código de Despesa nº {codigo_despesa} fonte {fonte}.')
+          ano_empenho = row['ANO DO EMPENHO']
+          c44 = c4.add_run(f'empenho nº {empenho}/{ano_empenho}, à Conta do Programa de Trabalho nº {programa_trabalho}, Código de Despesa nº {codigo_despesa} fonte {fonte}.')
           c44.font.size = Pt(11)
           c44.font.name = 'Arial'
           c44.font.size = Pt(11)
@@ -544,11 +545,12 @@ for index, row in tabela.iterrows():
           programa_trabalho = row['PROGRAMA DE TRABALHO']
           codigo_despesa = row['CÓDIGO DE DESPESA']
           fonte = row['FONTE']
+          ano_empenho = row['ANO DO EMPENHO']
           if num_dados == pen:
             p = ' e '
           elif num_dados == pen + 1:
             p = '.'
-          c44 = c4.add_run(f'empenho nº {empenho}/{ano}, à Conta do Programa de Trabalho nº {programa_trabalho}, Código de Despesa nº {codigo_despesa} fonte {fonte}{p}')
+          c44 = c4.add_run(f'empenho nº {empenho}/{ano_empenho}, à Conta do Programa de Trabalho nº {programa_trabalho}, Código de Despesa nº {codigo_despesa} fonte {fonte}{p}')
           c44.font.size = Pt(11)
           c44.font.name = 'Arial'
           c44.font.size = Pt(11)
@@ -563,6 +565,7 @@ for index, row in tabela.iterrows():
           programa_trabalho = row['PROGRAMA DE TRABALHO']
           codigo_despesa = row['CÓDIGO DE DESPESA']
           fonte = row['FONTE']
+          ano_empenho = row['ANO DO EMPENHO']
           pen = len(dados_filtrados) - 1
           if num_dados == pen:
             p = ' e '
@@ -570,7 +573,7 @@ for index, row in tabela.iterrows():
             p = '.'
           else:
             p = ', '
-          c44 = c4.add_run(f'empenho nº {empenho}/{ano}, à Conta do Programa de Trabalho nº {programa_trabalho}, Código de Despesa nº {codigo_despesa} fonte {fonte}{p}')
+          c44 = c4.add_run(f'empenho nº {empenho}/{ano_empenho}, à Conta do Programa de Trabalho nº {programa_trabalho}, Código de Despesa nº {codigo_despesa} fonte {fonte}{p}')
           c44.font.size = Pt(11)
           c44.font.name = 'Arial'
           c44.font.size = Pt(11)
